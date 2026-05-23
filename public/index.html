@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>STUCHA Loan Management</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand" aria-label="STUCHA Loan Management">
+        <span class="brand-mark">S</span>
+        <span>
+          <strong>STUCHA Loans</strong>
+          <small>Secure loan management</small>
+        </span>
+      </div>
+      <nav class="tabs" aria-label="Application sections">
+        <button class="tab active" type="button" data-tab="portal">Client Portal</button>
+        <button class="tab" type="button" data-tab="admin">Admin Dashboard</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="portal" class="view active" aria-labelledby="portal-title">
+        <div class="split-layout">
+          <form id="loan-form" class="panel form-panel" enctype="multipart/form-data">
+            <div class="section-heading">
+              <p class="eyebrow">New Application</p>
+              <h1 id="portal-title">Client Application Portal</h1>
+            </div>
+
+            <fieldset>
+              <legend>Identification</legend>
+              <div class="field-grid">
+                <label>
+                  <span>Full Name</span>
+                  <input name="fullName" autocomplete="name" required maxlength="120" placeholder="Client full name">
+                </label>
+                <label>
+                  <span>Student ID Number</span>
+                  <input name="studentId" required maxlength="50" placeholder="Student ID">
+                </label>
+                <label>
+                  <span>Phone Number</span>
+                  <input name="phone" autocomplete="tel" required maxlength="30" placeholder="+267 ...">
+                </label>
+              </div>
+              <div class="file-grid">
+                <label class="file-field">
+                  <span>Client Photo</span>
+                  <input name="clientPhoto" type="file" required accept="image/jpeg,image/png,image/webp">
+                  <small>Clear JPG, PNG, or WEBP face photo</small>
+                </label>
+                <label class="file-field">
+                  <span>Omang / Passport Photo</span>
+                  <input name="identityDocument" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+                  <small>JPG, PNG, WEBP, or PDF</small>
+                </label>
+                <label class="file-field">
+                  <span>Student ID Photo</span>
+                  <input name="studentDocument" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+                  <small>JPG, PNG, WEBP, or PDF</small>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Residence Verification</legend>
+              <div class="field-grid two">
+                <label>
+                  <span>Current Campus/Hostel Address</span>
+                  <textarea name="campusAddress" required maxlength="300" rows="3" placeholder="Campus, hostel, block, room"></textarea>
+                </label>
+                <label>
+                  <span>Home Address</span>
+                  <textarea name="homeAddress" required maxlength="300" rows="3" placeholder="Home village/town, ward, plot, street"></textarea>
+                </label>
+              </div>
+              <div class="location-field">
+                <label>
+                  <span>Google Maps Location</span>
+                  <input id="maps-location" name="googleMapsLocation" type="url" required maxlength="500" placeholder="https://www.google.com/maps?q=...">
+                </label>
+                <button id="use-location" class="secondary-button" type="button">Use Current Location</button>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Loan Calculator</legend>
+              <label class="category-field">
+                <span>Loan Category</span>
+                <select id="loan-category" name="loanCategory" required>
+                  <option value="standard">Standard 30% (1st - 27th)</option>
+                  <option value="late-month">Late Month 25% (15th - 27th)</option>
+                </select>
+              </label>
+              <div class="calculator-inputs">
+                <label class="range-wrap">
+                  <span>Loan Amount</span>
+                  <input id="loan-range" type="range" min="100" max="1000" step="50" value="100">
+                </label>
+                <label class="amount-input">
+                  <span>Pula</span>
+                  <input id="loan-amount" name="loanAmount" type="number" min="100" max="1000" step="0.01" value="100" required>
+                </label>
+              </div>
+              <div class="metrics" aria-live="polite">
+                <div>
+                  <span>Interest Amount</span>
+                  <strong id="interest-amount">P 300.00</strong>
+                </div>
+                <div>
+                  <span>Total Repayment</span>
+                  <strong id="total-repayment">P 1,300.00</strong>
+                </div>
+                <div>
+                  <span>Repayment Due Date</span>
+                  <strong id="due-date">Loading</strong>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Declaration & Signature</legend>
+              <label class="declaration">
+                <input id="declaration" name="declarationAccepted" type="checkbox" required>
+                <span>I acknowledge that this application creates a debt if approved, and I agree to repay the full amount by the due date shown above.</span>
+              </label>
+              <div class="signature-wrap">
+                <div class="signature-header">
+                  <span>Client Signature</span>
+                  <button id="clear-signature" class="ghost-button" type="button">Clear</button>
+                </div>
+                <canvas id="signature-pad" width="900" height="240" aria-label="Client signature pad"></canvas>
+                <input id="signature-data" name="signatureData" type="hidden" required>
+              </div>
+            </fieldset>
+
+            <div class="form-actions">
+              <p id="submission-message" class="message" role="status"></p>
+              <button class="primary-button" type="submit">Submit Loan Request</button>
+            </div>
+          </form>
+
+          <aside class="panel status-panel" aria-label="Loan summary">
+            <div class="section-heading">
+              <p class="eyebrow">Current Terms</p>
+              <h2>Loan Summary</h2>
+            </div>
+            <div class="summary-list">
+              <div>
+                <span>Principal</span>
+                <strong id="summary-principal">P 1,000.00</strong>
+              </div>
+              <div>
+                <span>Interest Rate</span>
+                <strong id="summary-interest-rate">30%</strong>
+              </div>
+              <div>
+                <span>Category</span>
+                <strong id="summary-category">Standard</strong>
+              </div>
+              <div>
+                <span>Due Date</span>
+                <strong id="summary-due-date">Loading</strong>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="admin" class="view" aria-labelledby="admin-title">
+        <div id="login-panel" class="panel admin-login">
+          <div class="section-heading">
+            <p class="eyebrow">Restricted</p>
+            <h1 id="admin-title">Admin Dashboard</h1>
+          </div>
+          <form id="login-form" class="login-form">
+            <label>
+              <span>Username</span>
+              <input name="username" autocomplete="username" value="admin" required>
+            </label>
+            <label>
+              <span>Password</span>
+              <input name="password" type="password" autocomplete="current-password" required>
+            </label>
+            <p id="login-message" class="message" role="status"></p>
+            <button class="primary-button" type="submit">Log In</button>
+          </form>
+        </div>
+
+        <div id="dashboard-panel" class="dashboard hidden">
+          <div class="dashboard-header">
+            <div class="section-heading">
+              <p class="eyebrow">Review Queue</p>
+              <h1>Admin Dashboard</h1>
+            </div>
+            <div class="dashboard-actions">
+              <button id="refresh-queue" class="secondary-button" type="button">Refresh</button>
+              <a id="download-spreadsheet" class="secondary-button link-button" href="/api/admin/spreadsheet">Download Spreadsheet</a>
+              <button id="rebuild-spreadsheet" class="ghost-button" type="button">Rebuild Spreadsheet</button>
+              <button id="logout-button" class="ghost-button" type="button">Log Out</button>
+            </div>
+          </div>
+
+          <div class="panel settings-panel">
+            <div class="section-heading compact">
+              <p class="eyebrow">Admin Security</p>
+              <h2>Set Username & Password</h2>
+            </div>
+            <form id="credentials-form" class="credentials-form">
+              <label>
+                <span>New Username</span>
+                <input id="admin-username" name="username" autocomplete="username" required minlength="3" maxlength="80">
+              </label>
+              <label>
+                <span>Current Password</span>
+                <input name="currentPassword" type="password" autocomplete="current-password" required>
+              </label>
+              <label>
+                <span>New Password</span>
+                <input name="password" type="password" autocomplete="new-password" required minlength="10">
+              </label>
+              <label>
+                <span>Confirm Password</span>
+                <input name="confirmPassword" type="password" autocomplete="new-password" required minlength="10">
+              </label>
+              <button class="secondary-button" type="submit">Save Credentials</button>
+              <p id="credentials-message" class="message" role="status"></p>
+            </form>
+          </div>
+
+          <div class="summary-strip" aria-live="polite">
+            <div>
+              <span>Pending</span>
+              <strong id="pending-count">0</strong>
+            </div>
+            <div>
+              <span>Approved</span>
+              <strong id="approved-count">0</strong>
+            </div>
+            <div>
+              <span>Amount Out</span>
+              <strong id="amount-out-total">P 0.00</strong>
+            </div>
+            <div>
+              <span>Expected In</span>
+              <strong id="amount-in-total">P 0.00</strong>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Approve</th>
+                  <th>Date</th>
+                  <th>Name</th>
+                  <th>Student ID</th>
+                  <th>Phone</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Total In</th>
+                  <th>Due</th>
+                  <th>Documents</th>
+                  <th>Location</th>
+                  <th>Declaration</th>
+                  <th>Status</th>
+                  <th>Spreadsheet</th>
+                </tr>
+              </thead>
+              <tbody id="queue-body">
+                <tr>
+                  <td colspan="14" class="empty-state">Log in to load applications.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
