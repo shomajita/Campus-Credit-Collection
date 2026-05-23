@@ -1,0 +1,16 @@
+
+ADMIN_PASSWORD is not set. A temporary development password was generated:
+  username: admin
+  password: t8VhIdSlOg1wS-Arx21L70QP
+Log in and set your own credentials from Admin Security.
+
+Error: Admin login required.
+    at httpError (C:\Users\User\Documents\Codex\2026-05-11\updated-prompt-for-codex-build-a\server.js:1301:17)
+    at requireAdmin (C:\Users\User\Documents\Codex\2026-05-11\updated-prompt-for-codex-build-a\server.js:1172:23)
+    at handleRequest (C:\Users\User\Documents\Codex\2026-05-11\updated-prompt-for-codex-build-a\server.js:214:5)
+    at Server.<anonymous> (C:\Users\User\Documents\Codex\2026-05-11\updated-prompt-for-codex-build-a\server.js:82:3)
+    at Server.emit (node:events:508:28)
+    at parserOnIncoming (node:_http_server:1210:12)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17) {
+  status: 401
+}

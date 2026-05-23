@@ -1,0 +1,13 @@
+{
+  "name": "stucha-loan-management",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secure loan application portal with admin approval, notifications, and Google Sheets sync.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

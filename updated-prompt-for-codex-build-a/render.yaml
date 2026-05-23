@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: campus-credit-collection
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    disk:
+      name: loan-storage
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: STORAGE_DIR
+        value: /var/data
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_HOURS
+        value: 8
+      - key: MIN_LOAN_AMOUNT
+        value: 100
+      - key: MAX_LOAN_AMOUNT
+        value: 1000
+      - key: DEFAULT_INTEREST_RATE
+        value: 0.30
+      - key: LATE_MONTH_INTEREST_RATE
+        value: 0.25
+      - key: REPAYMENT_DUE_DAY
+        value: 27
+      - key: OWNER_WHATSAPP_TO
+        sync: false
+      - key: OWNER_EMAIL
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: ALERT_FROM_EMAIL
+        sync: false
