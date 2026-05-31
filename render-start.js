@@ -14,6 +14,14 @@ source = source
     "return day >= category.startDay && day <= category.endDay;",
     "const endDay = Math.min(category.endDay, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate());\n  return day >= category.startDay && day <= endDay;"
   )
+  .replace(
+    "function getAdminUsername() {\n  return appSettings.admin?.username || config.adminUsername;\n}",
+    "function getAdminUsername() {\n  if (config.adminPassword) return config.adminUsername;\n  return appSettings.admin?.username || config.adminUsername;\n}"
+  )
+  .replace(
+    "async function verifyAdminCredentials(username, password) {\n  const admin = appSettings.admin;\n  if (admin?.passwordHash && admin?.passwordSalt) {\n    return username === admin.username && verifyPassword(password, admin);\n  }\n  return username === config.adminUsername && safeEqual(password, config.adminPassword);\n}",
+    "async function verifyAdminCredentials(username, password) {\n  if (config.adminPassword && username === config.adminUsername && safeEqual(password, config.adminPassword)) {\n    return true;\n  }\n  const admin = appSettings.admin;\n  if (admin?.passwordHash && admin?.passwordSalt) {\n    return username === admin.username && verifyPassword(password, admin);\n  }\n  return username === config.adminUsername && safeEqual(password, config.adminPassword);\n}"
+  )
   .replace(/password\.length < 10/g, "password.length < 8")
   .replace(/at least 10 characters/g, "at least 8 characters");
 
