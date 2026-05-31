@@ -1,0 +1,9 @@
+.env
+data/*.json
+data/*.csv
+data/screenshots/
+runtime-data/
+uploads/*
+!uploads/.gitkeep
+node_modules/
+*.log

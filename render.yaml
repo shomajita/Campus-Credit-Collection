@@ -12,7 +12,7 @@ services:
       - key: STORAGE_DIR
         value: runtime-data
       - key: ADMIN_USERNAME
-        value: admin
+        value: StuchaLoans
       - key: ADMIN_PASSWORD
         sync: false
       - key: SESSION_HOURS
