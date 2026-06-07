@@ -22,6 +22,8 @@ services:
         sync: false
       - key: SESSION_HOURS
         value: 8
+      - key: MAX_FILE_MB
+        value: 25
       - key: MIN_LOAN_AMOUNT
         value: 100
       - key: MAX_LOAN_AMOUNT

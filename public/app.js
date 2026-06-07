@@ -5,7 +5,7 @@ const state = {
     interestRate: 0.3,
     minLoanAmount: 100,
     maxLoanAmount: 1000,
-    maxFileMb: 8,
+    maxFileMb: 25,
     repaymentDueDate: "",
     loanCategories: [
       { id: "standard", label: "Standard 30%", rate: 0.3, startDay: 1, endDay: 31, available: true },
@@ -121,6 +121,9 @@ function bindForms() {
   document.querySelector("#session-logout").addEventListener("click", logout);
   document.querySelector("#refresh-queue").addEventListener("click", loadQueue);
   document.querySelector("#rebuild-spreadsheet").addEventListener("click", rebuildSpreadsheet);
+  document.querySelectorAll("#loan-form input[type='file']").forEach((input) => {
+    input.addEventListener("change", () => validateSelectedFiles(input.form, true));
+  });
 }
 
 function bindLocation() {
@@ -223,6 +226,7 @@ function applyConfig() {
 
   const firstAvailable = state.config.loanCategories.find((item) => item.available) || state.config.loanCategories[0];
   category.value = firstAvailable.id;
+  updateFileHelpText();
 }
 
 function updateCalculator() {
@@ -255,6 +259,9 @@ async function submitApplication(event) {
   document.querySelector("#signature-data").value = document.querySelector("#signature-pad").toDataURL("image/png");
   const activeApplicantType = document.querySelector("#applicant-type").value || "student";
   const formData = new FormData(form);
+  if (!validateSelectedFiles(form, true)) {
+    return;
+  }
 
   if (!formData.get("campusAddress") || !formData.get("homeAddress")) {
     setMessage("#submission-message", "Both campus/hostel and home address are required.", "error");
@@ -300,6 +307,51 @@ async function submitApplication(event) {
   } finally {
     button.disabled = false;
   }
+}
+
+function validateSelectedFiles(form, showMessage = false) {
+  const maxBytes = Number(state.config.maxFileMb || 25) * 1024 * 1024;
+  const labels = {
+    clientPhoto: "Client Photo",
+    identityDocument: "Omang / Passport Photo",
+    studentDocument: document.querySelector("#supporting-document-label")?.textContent || "Supporting Document"
+  };
+
+  for (const input of form.querySelectorAll("input[type='file']")) {
+    const file = input.files?.[0];
+    if (!file) continue;
+    if (file.size > maxBytes) {
+      if (showMessage) {
+        setMessage(
+          "#submission-message",
+          `${labels[input.name] || "Upload"} is ${formatFileSize(file.size)}. Maximum allowed is ${formatFileSize(maxBytes)}. Please choose a smaller photo or PDF.`,
+          "error"
+        );
+      }
+      return false;
+    }
+  }
+
+  if (showMessage) setMessage("#submission-message", "", "");
+  return true;
+}
+
+function updateFileHelpText() {
+  const maxText = `Max ${state.config.maxFileMb || 25}MB.`;
+  const applicantType = document.querySelector("#applicant-type")?.value || "student";
+  const supportingHelp = applicantType === "worker"
+    ? `Payslip, staff ID, or employment letter. ${maxText}`
+    : `JPG, PNG, WEBP, or PDF. ${maxText}`;
+  const helpTexts = [
+    ["input[name='clientPhoto']", `Clear JPG, PNG, or WEBP face photo. ${maxText}`],
+    ["input[name='identityDocument']", `JPG, PNG, WEBP, or PDF. ${maxText}`],
+    ["input[name='studentDocument']", supportingHelp]
+  ];
+
+  helpTexts.forEach(([selector, text]) => {
+    const help = document.querySelector(selector)?.closest(".file-field")?.querySelector("small");
+    if (help) help.textContent = text;
+  });
 }
 
 async function checkApplicationStatus(event) {
@@ -687,6 +739,7 @@ function setApplicantType(type) {
   document.querySelector("#supporting-document-help").textContent = copy.documentHelp;
   document.querySelector("#current-address-label").textContent = copy.addressLabel;
   document.querySelector("#current-address-input").placeholder = copy.addressPlaceholder;
+  updateFileHelpText();
 }
 
 async function approve(id, checkbox) {
@@ -902,6 +955,11 @@ function roundMoney(value) {
 
 function formatMoney(value) {
   return moneyFormatter.format(Number(value || 0)).replace("BWP", "P");
+}
+
+function formatFileSize(bytes) {
+  const mb = Number(bytes || 0) / 1024 / 1024;
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)}MB`;
 }
 
 function formatDisplayDate(value) {
