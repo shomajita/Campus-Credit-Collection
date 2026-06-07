@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { Readable } = require("node:stream");
@@ -58,8 +59,8 @@ let settingsQueue = Promise.resolve();
 let appSettings = {};
 
 const loanCategories = [
-  { id: "standard", label: "Standard 30%", rateKey: "standardInterestRate", startDay: 1, endDay: 27 },
-  { id: "late-month", label: "Late Month 25%", rateKey: "lateInterestRate", startDay: 15, endDay: 27 }
+  { id: "standard", label: "Standard 30%", rateKey: "standardInterestRate", startDay: 1, endDay: 31 },
+  { id: "late-month", label: "Late Month 25%", rateKey: "lateInterestRate", startDay: 15, endDay: 31 }
 ];
 
 const mimeTypes = {
@@ -100,6 +101,7 @@ bootstrap().then(() => {
 async function bootstrap() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  await recoverLegacyStorage();
   try {
     await fs.access(STORE_PATH);
   } catch {
@@ -114,6 +116,93 @@ async function bootstrap() {
     console.warn(`  password: ${config.adminPassword}`);
     console.warn("Log in and set your own credentials from Admin Security.");
     console.warn("");
+  }
+}
+
+async function recoverLegacyStorage() {
+  const legacyDataDirs = uniquePaths([
+    path.join(ROOT, "data"),
+    path.join(ROOT, "runtime-data", "data")
+  ]).filter((dir) => path.resolve(dir) !== path.resolve(DATA_DIR));
+  const legacyUploadDirs = uniquePaths([
+    path.join(ROOT, "uploads"),
+    path.join(ROOT, "runtime-data", "uploads")
+  ]).filter((dir) => path.resolve(dir) !== path.resolve(UPLOAD_DIR));
+
+  const currentApplications = await readJsonFile(STORE_PATH, []);
+  const byId = new Map(currentApplications.map((application) => [application?.id, application]).filter(([id]) => id));
+  let recoveredCount = 0;
+
+  for (const dir of legacyDataDirs) {
+    const legacyApplications = await readJsonFile(path.join(dir, "applications.json"), []);
+    if (!Array.isArray(legacyApplications) || !legacyApplications.length) continue;
+    for (const application of legacyApplications) {
+      if (!application?.id || byId.has(application.id)) continue;
+      byId.set(application.id, application);
+      recoveredCount += 1;
+    }
+  }
+
+  if (recoveredCount > 0) {
+    const merged = Array.from(byId.values()).sort((left, right) => {
+      return String(right.submittedAt || "").localeCompare(String(left.submittedAt || ""));
+    });
+    await writeApplications(merged);
+    console.warn(`Recovered ${recoveredCount} loan application(s) from legacy storage folders.`);
+  } else {
+    try {
+      await fs.access(STORE_PATH);
+    } catch {
+      await fs.writeFile(STORE_PATH, "[]\n", "utf8");
+    }
+  }
+
+  for (const dir of legacyUploadDirs) {
+    await copyMissingUploads(dir, UPLOAD_DIR);
+  }
+
+  await recoverSettings(legacyDataDirs);
+}
+
+async function recoverSettings(legacyDataDirs) {
+  try {
+    await fs.access(SETTINGS_PATH);
+    return;
+  } catch {}
+
+  for (const dir of legacyDataDirs) {
+    const legacyPath = path.join(dir, "settings.json");
+    const settings = await readJsonFile(legacyPath, null);
+    if (!settings || typeof settings !== "object") continue;
+    await writeSettings(settings);
+    console.warn("Recovered admin/client settings from legacy storage.");
+    return;
+  }
+}
+
+async function copyMissingUploads(sourceDir, destinationDir) {
+  let entries = [];
+  try {
+    entries = await fs.readdir(sourceDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  await fs.mkdir(destinationDir, { recursive: true });
+  let copied = 0;
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const sourcePath = path.join(sourceDir, entry.name);
+    const destinationPath = path.join(destinationDir, entry.name);
+    try {
+      await fs.copyFile(sourcePath, destinationPath, fsSync.constants.COPYFILE_EXCL);
+      copied += 1;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+  }
+  if (copied > 0) {
+    console.warn(`Recovered ${copied} upload file(s) from ${sourceDir}.`);
   }
 }
 
@@ -148,14 +237,38 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/client/session") {
+    await getClientSessionInfo(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/client/login") {
+    assertRateLimit(req, "client-login", 12, 15 * 60 * 1000);
+    await loginClient(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/logout") {
+    logoutSession(req, res);
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/applications") {
+    requireClient(req);
     assertRateLimit(req, "submit", 8, 15 * 60 * 1000);
     await createApplication(req, res);
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/applications/status") {
+    requireClient(req);
+    assertRateLimit(req, "status", 20, 15 * 60 * 1000);
+    await lookupApplicationStatus(req, res);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/admin/session") {
-    const session = getSession(req);
+    const session = getAdminSession(req);
     sendJson(res, 200, session ? { authenticated: true, username: session.username, csrfToken: session.csrfToken, adminUsername: getAdminUsername() } : { authenticated: false, adminUsername: getAdminUsername() });
     return;
   }
@@ -223,6 +336,13 @@ async function handleRequest(req, res) {
     return;
   }
 
+  const rejectMatch = url.pathname.match(/^\/api\/admin\/applications\/([^/]+)\/reject$/);
+  if (rejectMatch && req.method === "POST") {
+    requireCsrf(req);
+    await rejectApplication(res, rejectMatch[1]);
+    return;
+  }
+
   const syncMatch = url.pathname.match(/^\/api\/admin\/applications\/([^/]+)\/sync-sheet$/);
   if (syncMatch && req.method === "POST") {
     requireCsrf(req);
@@ -239,6 +359,7 @@ async function handleRequest(req, res) {
 }
 
 async function createApplication(req, res) {
+  const clientSession = requireClient(req);
   const contentLength = Number(req.headers["content-length"] || 0);
   const maxBodyBytes = config.maxFileBytes * 3 + 2 * 1024 * 1024;
   if (contentLength > maxBodyBytes) {
@@ -248,9 +369,15 @@ async function createApplication(req, res) {
   const form = await readFormData(req);
   const submittedDate = new Date();
   const input = {
+    applicantType: normalizeApplicantType(form.get("applicantType")),
+    clientEmail: clientSession.email,
     fullName: cleanText(form.get("fullName"), 120),
     studentId: cleanText(form.get("studentId"), 50),
     phone: cleanText(form.get("phone"), 30),
+    motherKinName: cleanText(form.get("motherKinName"), 120),
+    motherKinPhone: cleanText(form.get("motherKinPhone"), 30),
+    fatherKinName: cleanText(form.get("fatherKinName"), 120),
+    fatherKinPhone: cleanText(form.get("fatherKinPhone"), 30),
     campusAddress: cleanText(form.get("campusAddress"), 300),
     homeAddress: cleanText(form.get("homeAddress"), 300),
     googleMapsLocation: cleanText(form.get("googleMapsLocation"), 500),
@@ -289,9 +416,26 @@ async function createApplication(req, res) {
   const application = {
     id: applicationId,
     submittedAt,
+    applicantType: input.applicantType,
+    applicantTypeLabel: applicantTypeLabel(input.applicantType),
+    clientEmail: input.clientEmail,
     fullName: input.fullName,
     studentId: input.studentId,
     phone: input.phone,
+    motherKinName: input.motherKinName,
+    motherKinPhone: input.motherKinPhone,
+    fatherKinName: input.fatherKinName,
+    fatherKinPhone: input.fatherKinPhone,
+    nextOfKin: {
+      mother: {
+        name: input.motherKinName,
+        phone: input.motherKinPhone
+      },
+      father: {
+        name: input.fatherKinName,
+        phone: input.fatherKinPhone
+      }
+    },
     campusAddress: input.campusAddress,
     homeAddress: input.homeAddress,
     googleMapsLocation: input.googleMapsLocation,
@@ -345,6 +489,7 @@ async function createApplication(req, res) {
   sendJson(res, 201, {
     ok: true,
     applicationId,
+    status: toClientStatus(application),
     interestAmount,
     totalRepayment,
     repaymentDueDate: application.repaymentDueDate,
@@ -354,6 +499,116 @@ async function createApplication(req, res) {
       whatsapp: whatsappResult.status,
       email: emailResult.status
     }
+  });
+}
+
+async function lookupApplicationStatus(req, res) {
+  const clientSession = requireClient(req);
+  const body = await readJson(req);
+  const applicationId = cleanText(body.applicationId, 80);
+  const studentId = cleanText(body.studentId, 50);
+  const phone = cleanText(body.phone, 30);
+  const errors = [];
+
+  if (!phone || normalizePhone(phone).length < 7) errors.push("Phone number is required.");
+  if (!applicationId && !studentId) errors.push("Enter your application reference or student ID number.");
+  if (errors.length) {
+    sendJson(res, 400, { error: errors.join(" ") });
+    return;
+  }
+
+  const applications = await readApplications();
+  const normalizedPhone = normalizePhone(phone);
+  const matches = applications
+    .filter((application) => {
+      if (application.clientEmail && normalizeEmail(application.clientEmail) !== clientSession.email) return false;
+      if (normalizePhone(application.phone) !== normalizedPhone) return false;
+      if (applicationId && application.id === applicationId) return true;
+      return studentId && cleanText(application.studentId, 50).toLowerCase() === studentId.toLowerCase();
+    })
+    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)));
+
+  if (!matches.length) {
+    sendJson(res, 404, { error: "No matching application was found. Check the reference, student ID, and phone number." });
+    return;
+  }
+
+  sendJson(res, 200, { ok: true, application: toClientStatus(matches[0]) });
+}
+
+async function getClientSessionInfo(req, res) {
+  const session = getClientSession(req);
+  if (!session) {
+    sendJson(res, 200, { authenticated: false });
+    return;
+  }
+
+  sendJson(res, 200, {
+    authenticated: true,
+    email: session.email,
+    csrfToken: session.csrfToken,
+    latestApplication: await latestClientApplication(session.email)
+  });
+}
+
+async function loginClient(req, res) {
+  const body = await readJson(req);
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === "string" ? body.password : "";
+  const errors = validateClientCredentialInput(email, password);
+
+  if (errors.length) {
+    sendJson(res, 400, { error: errors.join(" ") });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  let outcome = null;
+  await withSettings(async (settings) => {
+    settings.clients ||= {};
+    const existing = settings.clients[email];
+    if (existing) {
+      if (!verifyPassword(password, existing)) {
+        outcome = { ok: false, error: "Invalid client credentials." };
+        return existing;
+      }
+      existing.lastLoginAt = now;
+      outcome = { ok: true, created: false };
+      appSettings = settings;
+      return existing;
+    }
+
+    const passwordRecord = hashPassword(password);
+    settings.clients[email] = {
+      email,
+      passwordHash: passwordRecord.hash,
+      passwordSalt: passwordRecord.salt,
+      passwordIterations: passwordRecord.iterations,
+      passwordAlgorithm: passwordRecord.algorithm,
+      createdAt: now,
+      lastLoginAt: now
+    };
+    outcome = { ok: true, created: true };
+    appSettings = settings;
+    return settings.clients[email];
+  });
+
+  if (!outcome?.ok) {
+    sendJson(res, 401, { error: outcome?.error || "Invalid client credentials." });
+    return;
+  }
+
+  const sid = crypto.randomBytes(32).toString("base64url");
+  const csrfToken = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = Date.now() + config.sessionHours * 60 * 60 * 1000;
+  sessions.set(sid, { type: "client", email, csrfToken, expiresAt });
+  setSessionCookie(res, sid);
+  sendJson(res, 200, {
+    ok: true,
+    email,
+    csrfToken,
+    created: Boolean(outcome.created),
+    latestApplication: await latestClientApplication(email)
   });
 }
 
@@ -370,7 +625,7 @@ async function loginAdmin(req, res) {
   const sid = crypto.randomBytes(32).toString("base64url");
   const csrfToken = crypto.randomBytes(32).toString("base64url");
   const expiresAt = Date.now() + config.sessionHours * 60 * 60 * 1000;
-  sessions.set(sid, { username, csrfToken, expiresAt });
+  sessions.set(sid, { type: "admin", username, csrfToken, expiresAt });
   setSessionCookie(res, sid);
   sendJson(res, 200, { ok: true, username, csrfToken });
 }
@@ -426,6 +681,38 @@ async function approveApplication(res, applicationId) {
 
   if (!app) {
     sendJson(res, 404, { error: "Application not found." });
+    return;
+  }
+
+  const spreadsheetResult = await refreshLocalSpreadsheet();
+  const updated = await withApplications(async (applications) => {
+    const saved = applications.find((item) => item.id === applicationId);
+    if (saved) saved.sheetSync = spreadsheetResult;
+    return saved;
+  });
+  sendJson(res, 200, { ok: true, application: toAdminApplication(updated) });
+}
+
+async function rejectApplication(res, applicationId) {
+  const app = await withApplications(async (applications) => {
+    const application = applications.find((item) => item.id === applicationId);
+    if (!application) return null;
+    if (application.status === "Approved") return { locked: true, application };
+    if (application.status !== "Rejected") {
+      application.status = "Rejected";
+      application.rejectedAt = new Date().toISOString();
+      application.sheetSync = { status: "pending", provider: "local_spreadsheet" };
+    }
+    return application;
+  });
+
+  if (!app) {
+    sendJson(res, 404, { error: "Application not found." });
+    return;
+  }
+
+  if (app.locked) {
+    sendJson(res, 400, { error: "Approved applications cannot be rejected." });
     return;
   }
 
@@ -538,10 +825,15 @@ function localSpreadsheetHeaders() {
     "Application ID",
     "Submitted At",
     "Approved At",
+    "Applicant Type",
     "Name",
-    "Student ID",
+    "Applicant ID",
     "Phone",
-    "Campus/Hostel Address",
+    "Next of Kin Mother",
+    "Mother Phone",
+    "Next of Kin Father",
+    "Father Phone",
+    "Current Campus/Workplace Address",
     "Home Address",
     "Google Maps Location",
     "Loan Category",
@@ -569,9 +861,14 @@ function toLocalSpreadsheetRow(application) {
     application.id,
     application.submittedAt,
     application.approvedAt || "",
+    application.applicantTypeLabel || applicantTypeLabel(application.applicantType),
     application.fullName,
     application.studentId,
     application.phone,
+    application.motherKinName || application.nextOfKin?.mother?.name || "",
+    application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
+    application.fatherKinName || application.nextOfKin?.father?.name || "",
+    application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
     application.campusAddress,
     application.homeAddress,
     application.googleMapsLocation || "",
@@ -664,9 +961,14 @@ async function sendEmailAlert(application) {
   const text = [
     `New Loan Request from ${application.fullName}`,
     "",
-    `Student ID: ${application.studentId}`,
+    `Applicant Type: ${application.applicantTypeLabel || applicantTypeLabel(application.applicantType)}`,
+    `Applicant ID: ${application.studentId}`,
     `Phone: ${application.phone}`,
-    `Campus/Hostel Address: ${application.campusAddress}`,
+    `Next of Kin (Mother): ${application.motherKinName || application.nextOfKin?.mother?.name || ""}`,
+    `Mother Phone: ${application.motherKinPhone || application.nextOfKin?.mother?.phone || ""}`,
+    `Next of Kin (Father): ${application.fatherKinName || application.nextOfKin?.father?.name || ""}`,
+    `Father Phone: ${application.fatherKinPhone || application.nextOfKin?.father?.phone || ""}`,
+    `Current Campus/Workplace Address: ${application.campusAddress}`,
     `Home Address: ${application.homeAddress}`,
     `Google Maps Location: ${application.googleMapsLocation}`,
     `Loan Category: ${application.loanCategoryLabel || formatPercent(application.interestRate)}`,
@@ -837,9 +1139,15 @@ function notificationApplicationSummary(application) {
   return {
     id: application.id,
     submittedAt: application.submittedAt,
+    applicantType: application.applicantType || "student",
+    applicantTypeLabel: application.applicantTypeLabel || applicantTypeLabel(application.applicantType),
     fullName: application.fullName,
     studentId: application.studentId,
     phone: application.phone,
+    motherKinName: application.motherKinName || application.nextOfKin?.mother?.name || "",
+    motherKinPhone: application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
+    fatherKinName: application.fatherKinName || application.nextOfKin?.father?.name || "",
+    fatherKinPhone: application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
     campusAddress: application.campusAddress,
     homeAddress: application.homeAddress,
     googleMapsLocation: application.googleMapsLocation,
@@ -853,11 +1161,49 @@ function notificationApplicationSummary(application) {
   };
 }
 
+function toClientStatus(application) {
+  const statusLabel = application.status === "Pending" ? "In Progress" : application.status;
+  const messages = {
+    Pending: "Your application has been received and is waiting for review.",
+    Approved: "Your application has been approved. Please follow the repayment terms shown here.",
+    Rejected: "Your application was not approved. Contact STUCHA Loans if you need more information."
+  };
+  return {
+    applicationId: application.id,
+    submittedAt: application.submittedAt,
+    applicantType: application.applicantType || "student",
+    applicantTypeLabel: application.applicantTypeLabel || applicantTypeLabel(application.applicantType),
+    fullName: application.fullName,
+    loanAmount: application.loanAmount,
+    interestAmount: application.interestAmount,
+    totalRepayment: application.totalRepayment,
+    repaymentDueDate: application.repaymentDueDate,
+    loanCategoryLabel: application.loanCategoryLabel || formatPercent(application.interestRate || config.standardInterestRate),
+    status: application.status,
+    statusLabel,
+    message: messages[application.status] || messages.Pending
+  };
+}
+
+async function latestClientApplication(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+  const applications = await readApplications();
+  const match = applications
+    .filter((application) => normalizeEmail(application.clientEmail) === normalizedEmail)
+    .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)))[0];
+  return match ? toClientStatus(match) : null;
+}
+
 function validateApplicationInput(input, terms, submittedDate) {
   const errors = [];
   if (!input.fullName || input.fullName.length < 2) errors.push("Full name is required.");
   if (!input.studentId || input.studentId.length < 2) errors.push("Student ID number is required.");
   if (!input.phone || input.phone.length < 7) errors.push("Phone number is required.");
+  if (!input.motherKinName || input.motherKinName.length < 2) errors.push("Next of kin mother name is required.");
+  if (!input.motherKinPhone || normalizePhone(input.motherKinPhone).length < 7) errors.push("Mother phone number is required.");
+  if (!input.fatherKinName || input.fatherKinName.length < 2) errors.push("Next of kin father name is required.");
+  if (!input.fatherKinPhone || normalizePhone(input.fatherKinPhone).length < 7) errors.push("Father phone number is required.");
   if (!input.campusAddress || input.campusAddress.length < 5) errors.push("Current campus/hostel address is required.");
   if (!input.homeAddress || input.homeAddress.length < 5) errors.push("Home address is required.");
   if (!isGoogleMapsUrl(input.googleMapsLocation)) errors.push("A valid Google Maps location link is required.");
@@ -959,7 +1305,12 @@ function getLoanCategoriesForClient(date = new Date()) {
 
 function isCategoryOpen(category, date = new Date()) {
   const day = date.getDate();
-  return day >= category.startDay && day <= category.endDay;
+  const endDay = Math.min(category.endDay, daysInMonth(date));
+  return day >= category.startDay && day <= endDay;
+}
+
+function daysInMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
 function calculateRepaymentDueDate(date = new Date()) {
@@ -1064,6 +1415,15 @@ async function readApplications() {
   }
 }
 
+async function readJsonFile(filePath, fallback) {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
 async function readSettings() {
   try {
     const raw = await fs.readFile(SETTINGS_PATH, "utf8");
@@ -1083,6 +1443,18 @@ async function writeApplications(applications) {
   const tempPath = `${STORE_PATH}.${crypto.randomBytes(8).toString("hex")}.tmp`;
   await fs.writeFile(tempPath, `${JSON.stringify(applications, null, 2)}\n`, "utf8");
   await fs.rename(tempPath, STORE_PATH);
+}
+
+function uniquePaths(paths) {
+  const seen = new Set();
+  const unique = [];
+  for (const item of paths) {
+    const resolved = path.resolve(item);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    unique.push(item);
+  }
+  return unique;
 }
 
 async function withApplications(mutator) {
@@ -1113,9 +1485,25 @@ function toAdminApplication(application) {
     id: application.id,
     submittedAt: application.submittedAt,
     approvedAt: application.approvedAt || "",
+    applicantType: application.applicantType || "student",
+    applicantTypeLabel: application.applicantTypeLabel || applicantTypeLabel(application.applicantType),
     fullName: application.fullName,
     studentId: application.studentId,
     phone: application.phone,
+    motherKinName: application.motherKinName || application.nextOfKin?.mother?.name || "",
+    motherKinPhone: application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
+    fatherKinName: application.fatherKinName || application.nextOfKin?.father?.name || "",
+    fatherKinPhone: application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
+    nextOfKin: {
+      mother: {
+        name: application.motherKinName || application.nextOfKin?.mother?.name || "",
+        phone: application.motherKinPhone || application.nextOfKin?.mother?.phone || ""
+      },
+      father: {
+        name: application.fatherKinName || application.nextOfKin?.father?.name || "",
+        phone: application.fatherKinPhone || application.nextOfKin?.father?.phone || ""
+      }
+    },
     campusAddress: application.campusAddress,
     homeAddress: application.homeAddress,
     googleMapsLocation: application.googleMapsLocation || "",
@@ -1168,8 +1556,14 @@ function normalizeSpreadsheetStatus(status) {
 }
 
 function requireAdmin(req) {
-  const session = getSession(req);
+  const session = getAdminSession(req);
   if (!session) throw httpError(401, "Admin login required.");
+  return session;
+}
+
+function requireClient(req) {
+  const session = getClientSession(req);
+  if (!session) throw httpError(401, "Client login required.");
   return session;
 }
 
@@ -1182,11 +1576,39 @@ function requireCsrf(req) {
   return session;
 }
 
+function getClientSession(req) {
+  const session = getSession(req);
+  if (!session || session.type !== "client" || !session.email) return null;
+  return session;
+}
+
+function getAdminSession(req) {
+  const session = getSession(req);
+  if (!session || session.type !== "admin") return null;
+  return session;
+}
+
+function logoutSession(req, res) {
+  const sid = readCookie(req, "sid");
+  const session = sid ? sessions.get(sid) : null;
+  const token = req.headers["x-csrf-token"];
+  if (session && (!token || !safeEqual(String(token), session.csrfToken))) {
+    throw httpError(403, "Invalid security token.");
+  }
+  if (sid) sessions.delete(sid);
+  clearSessionCookie(res);
+  sendJson(res, 200, { ok: true });
+}
+
 function getAdminUsername() {
+  if (config.adminPassword) return config.adminUsername;
   return appSettings.admin?.username || config.adminUsername;
 }
 
 async function verifyAdminCredentials(username, password) {
+  if (config.adminPassword && username === config.adminUsername && safeEqual(password, config.adminPassword)) {
+    return true;
+  }
   const admin = appSettings.admin;
   if (admin?.passwordHash && admin?.passwordSalt) {
     return username === admin.username && verifyPassword(password, admin);
@@ -1199,8 +1621,22 @@ function validateAdminCredentialInput(username, password) {
   if (!/^[A-Za-z0-9._@-]{3,80}$/.test(username)) {
     errors.push("Username must be 3-80 characters and use only letters, numbers, dots, underscores, hyphens, or @.");
   }
-  if (password.length < 10) {
-    errors.push("Password must be at least 10 characters.");
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters.");
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    errors.push("Password must include at least one letter and one number.");
+  }
+  return errors;
+}
+
+function validateClientCredentialInput(email, password) {
+  const errors = [];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push("A valid email address is required.");
+  }
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters.");
   }
   if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
     errors.push("Password must include at least one letter and one number.");
@@ -1359,6 +1795,22 @@ function safeEqual(left, right) {
     return false;
   }
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function normalizeEmail(value) {
+  return cleanText(value, 160).toLowerCase();
+}
+
+function normalizeApplicantType(value) {
+  return String(value || "").toLowerCase() === "worker" ? "worker" : "student";
+}
+
+function applicantTypeLabel(value) {
+  return normalizeApplicantType(value) === "worker" ? "Worker" : "Student";
 }
 
 function toInt(value, fallback) {

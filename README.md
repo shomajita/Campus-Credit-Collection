@@ -15,10 +15,12 @@ If `ADMIN_PASSWORD` is not set, the server prints a temporary development passwo
 ## What Is Included
 
 - Client portal with required full name, student ID, phone, client photo, Omang/passport upload, student ID upload, campus/hostel address, home address, Google Maps location, debt declaration, signature, and loan amount.
+- Client status lookup using the application reference or student ID plus phone number.
 - Loan calculator with P100 minimum and P1000 maximum by default.
-- Loan categories: Standard 30% for the 1st-27th, and Late Month 25% for the 15th-27th.
-- Repayment due date is the 27th of the month, moved back to Friday when the 27th falls on a weekend.
+- Loan categories: Standard 30% from the 1st to month end, and Late Month 25% from the 15th to month end.
+- Repayment due date is the 27th of the current month, or the next month when applying after the 27th. If the 27th falls on a weekend, it moves back to Friday.
 - Admin dashboard with a review queue, document links, Google Maps links, approval checkbox, local spreadsheet status, and a security panel to set your own admin username and password.
+- Admin approval and rejection actions. Clients see Pending as "In Progress" when they check their status.
 - Local CSV spreadsheet at `data/loan_applications.csv`, with an admin-only download button in the dashboard.
 - Upload validation by file signature for JPG, PNG, WEBP, and PDF.
 - Session cookies, CSRF protection for admin actions, strict security headers, rate limiting, and non-public upload storage.
@@ -116,6 +118,30 @@ REPAYMENT_DUE_DAY=27
 ```
 
 Then add Twilio and SendGrid values when you are ready for WhatsApp/email alerts.
+
+Notification environment variables:
+
+```env
+OWNER_WHATSAPP_TO=whatsapp:+2677XXXXXXX
+OWNER_EMAIL=you@example.com
+
+# For WhatsApp through Twilio
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+
+# Or for a WhatsApp automation webhook
+WHATSAPP_WEBHOOK_URL=https://...
+
+# For email through SendGrid
+SENDGRID_API_KEY=...
+ALERT_FROM_EMAIL=alerts@yourdomain.com
+
+# Or for an email automation webhook
+EMAIL_WEBHOOK_URL=https://...
+```
+
+Setting only `OWNER_WHATSAPP_TO` or only `OWNER_EMAIL` stores the destination, but an actual provider such as Twilio, SendGrid, or a webhook is required to send real alerts.
 
 ## Production Notes
 
