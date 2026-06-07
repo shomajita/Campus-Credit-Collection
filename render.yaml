@@ -2,7 +2,6 @@ services:
   - type: web
     name: campus-credit-collection
     runtime: node
-    rootDir: updated-prompt-for-codex-build-a
     plan: starter
     region: oregon
     buildCommand: npm install
