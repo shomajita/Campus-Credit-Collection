@@ -323,11 +323,14 @@
             </div>
           </div>
 
-          <div class="panel settings-panel">
-            <div class="section-heading compact">
-              <p class="eyebrow">Admin Security</p>
-              <h2>Set Username & Password</h2>
-            </div>
+          <details class="panel settings-panel">
+            <summary>
+              <span>
+                <span class="eyebrow">Admin Security</span>
+                <strong>Change Username & Password</strong>
+              </span>
+              <span class="settings-hint">Open only when you want to update login details</span>
+            </summary>
             <form id="credentials-form" class="credentials-form">
               <label>
                 <span>New Username</span>
@@ -348,7 +351,7 @@
               <button class="secondary-button" type="submit">Save Credentials</button>
               <p id="credentials-message" class="message" role="status"></p>
             </form>
-          </div>
+          </details>
 
           <div class="summary-strip" aria-live="polite">
             <div>
