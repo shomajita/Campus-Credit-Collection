@@ -215,6 +215,13 @@ main {
   color: #ffb5bd;
 }
 
+.auth-help {
+  margin: -2px 0 16px;
+  color: #c8d6e8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .auth-side {
   background: var(--white);
 }

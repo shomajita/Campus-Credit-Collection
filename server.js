@@ -23,7 +23,7 @@ const config = {
   port: toInt(process.env.PORT, 4173),
   publicAppUrl: trimSlash(process.env.PUBLIC_APP_URL || defaultPublicAppUrl()),
   adminUsername: process.env.ADMIN_USERNAME || "admin",
-  adminPassword: process.env.ADMIN_PASSWORD || "",
+  adminPassword: process.env.ADMIN_PASSWORD || "Tashab26",
   sessionHours: toInt(process.env.SESSION_HOURS, 8),
   maxFileBytes: toInt(process.env.MAX_FILE_MB, 8) * 1024 * 1024,
   minLoanAmount: toNumber(process.env.MIN_LOAN_AMOUNT, 100),
@@ -47,10 +47,6 @@ const config = {
 };
 
 let generatedAdminPassword = false;
-if (!config.adminPassword) {
-  config.adminPassword = crypto.randomBytes(18).toString("base64url");
-  generatedAdminPassword = true;
-}
 
 const sessions = new Map();
 const rateBuckets = new Map();

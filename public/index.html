@@ -39,19 +39,21 @@
             </div>
 
             <form id="client-login-form" class="login-form auth-form">
+              <p class="auth-help">New clients can enter their email and create a password here. Use the same email and password later to view loan status.</p>
               <label>
                 <span>Email</span>
                 <input name="email" type="email" autocomplete="email" required maxlength="160" placeholder="client@email.com">
               </label>
               <label>
                 <span>Password</span>
-                <input name="password" type="password" autocomplete="current-password" required minlength="8">
+                <input name="password" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters">
               </label>
               <p id="client-login-message" class="message" role="status"></p>
-              <button class="primary-button" type="submit">Enter Client Portal</button>
+              <button class="primary-button" type="submit">Create / Enter Client Portal</button>
             </form>
 
             <form id="auth-admin-login-form" class="login-form auth-form hidden">
+              <p class="auth-help">Admin access is restricted to your dashboard credentials.</p>
               <label>
                 <span>Username</span>
                 <input name="username" autocomplete="username" value="admin" required>
