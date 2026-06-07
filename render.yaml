@@ -2,15 +2,21 @@ services:
   - type: web
     name: campus-credit-collection
     runtime: node
-    plan: free
+    rootDir: updated-prompt-for-codex-build-a
+    plan: starter
+    region: oregon
     buildCommand: npm install
     startCommand: node render-start.js
     healthCheckPath: /healthz
+    disk:
+      name: loan-storage
+      mountPath: /var/data
+      sizeGB: 5
     envVars:
       - key: NODE_VERSION
         value: 24.14.1
       - key: STORAGE_DIR
-        value: runtime-data
+        value: /var/data
       - key: ADMIN_USERNAME
         value: StuchaLoans
       - key: ADMIN_PASSWORD
@@ -27,3 +33,21 @@ services:
         value: 0.25
       - key: REPAYMENT_DUE_DAY
         value: 27
+      - key: OWNER_WHATSAPP_TO
+        sync: false
+      - key: OWNER_EMAIL
+        sync: false
+      - key: WHATSAPP_WEBHOOK_URL
+        sync: false
+      - key: EMAIL_WEBHOOK_URL
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: ALERT_FROM_EMAIL
+        sync: false
