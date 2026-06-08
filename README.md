@@ -143,6 +143,21 @@ EMAIL_WEBHOOK_URL=https://...
 
 Setting only `OWNER_WHATSAPP_TO` or only `OWNER_EMAIL` stores the destination, but an actual provider such as Twilio, SendGrid, or a webhook is required to send real alerts.
 
+## Railway PostgreSQL + Jotform Webhook API
+
+This repository also includes a separate FastAPI webhook service in `services/webhook_api`. Use it when you are ready to receive Jotform webhooks, store submissions in Railway PostgreSQL, and optionally append summary rows to Google Sheets.
+
+Deploy it as a second Render Web Service using:
+
+```text
+Root Directory: services/webhook_api
+Build Command: pip install -r requirements.txt
+Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Health Check Path: /healthz
+```
+
+Set `DATABASE_URL` in Render to your rotated Railway PostgreSQL connection string. Do not commit the real Railway URL to GitHub. Full setup instructions are in `services/webhook_api/README.md`.
+
 ## Production Notes
 
 Use HTTPS, a permanent database, encrypted object storage, antivirus scanning for uploads, backups, audit logs, and a real deployment secret manager before collecting actual Omang/passport or student ID records. This local app keeps uploads outside the public folder and requires admin login to view them, but production identity-document storage deserves stronger infrastructure controls.
