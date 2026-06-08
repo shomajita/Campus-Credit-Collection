@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function bindTabs() {
-  document.querySelectorAll(".tab").forEach((button) => {
+  document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
 }
@@ -81,7 +81,7 @@ function activateTab(tabName) {
   });
   if (tabName === "workers") setApplicantType("worker");
   if (tabName === "portal") setApplicantType("student");
-  history.replaceState(null, "", tabName === "admin" ? "#admin" : tabName === "workers" ? "#workers" : "#portal");
+  history.replaceState(null, "", tabName === "admin" ? "#admin" : tabName === "workers" ? "#workers" : tabName === "about" ? "#about" : "#portal");
 
   if (tabName === "admin") {
     showDashboard();
@@ -415,6 +415,10 @@ function routeFromHash() {
   }
   if (location.hash === "#admin") {
     activateTab("admin");
+    return;
+  }
+  if (location.hash === "#about") {
+    activateTab("about");
     return;
   }
   if (location.hash === "#workers") {
