@@ -96,6 +96,8 @@ This repository includes `render.yaml` for a Render web service.
 
 Use a paid Render web service plan with a persistent disk. Render's normal service filesystem is ephemeral, so uploaded IDs/photos/signatures and the local spreadsheet need the disk mounted at `/var/data`.
 
+The Blueprint also defines a separate `stucha-webhook-api` Python service for Railway PostgreSQL/Jotform webhooks. If you apply the Blueprint, Render will ask you to fill the secrets marked `sync: false`, including `DATABASE_URL`.
+
 Recommended Render settings:
 
 ```text
