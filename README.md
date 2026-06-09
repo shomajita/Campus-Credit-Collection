@@ -152,9 +152,9 @@ This repository also includes a separate FastAPI webhook service in `services/we
 Deploy it as a second Render Web Service using:
 
 ```text
-Root Directory: services/webhook_api
-Build Command: pip install -r requirements.txt
-Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Root Directory: leave blank
+Build Command: pip install -r services/webhook_api/requirements.txt
+Start Command: cd services/webhook_api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 Health Check Path: /healthz
 ```
 

@@ -57,9 +57,8 @@ services:
     runtime: python
     plan: free
     region: oregon
-    rootDir: services/webhook_api
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r services/webhook_api/requirements.txt
+    startCommand: cd services/webhook_api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
