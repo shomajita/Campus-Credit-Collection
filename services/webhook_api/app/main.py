@@ -1,4 +1,4 @@
-from typing import Any, Annotated
+from typing import Any, Dict, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from sqlalchemy import select, text
@@ -25,7 +25,7 @@ def startup() -> None:
 
 
 @app.get("/healthz")
-def healthz() -> dict[str, Any]:
+def healthz() -> Dict[str, Any]:
     with engine.connect() as connection:
         connection.execute(text("select 1"))
     return {"ok": True, "database": "ok"}
@@ -36,9 +36,9 @@ async def jotform_webhook(
     request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    x_webhook_secret: Annotated[str | None, Header()] = None,
-    token: Annotated[str | None, Query()] = None,
-) -> dict[str, Any]:
+    x_webhook_secret: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+) -> Dict[str, Any]:
     verify_webhook_secret(settings, x_webhook_secret, token)
 
     payload = await parse_request_payload(request)
@@ -105,9 +105,9 @@ async def jotform_webhook(
 def list_submissions(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    x_admin_api_key: Annotated[str | None, Header()] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-) -> dict[str, Any]:
+    x_admin_api_key: Optional[str] = Header(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> Dict[str, Any]:
     ensure_admin_key(settings, x_admin_api_key)
     rows = db.scalars(
         select(JotformSubmission)

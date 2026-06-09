@@ -1,6 +1,6 @@
 import base64
 import json
-from typing import Any
+from typing import Any, Dict
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -14,12 +14,12 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 def append_submission_to_sheet(
     settings: Settings,
     submission: JotformSubmission,
-) -> dict[str, str]:
+) -> Dict[str, str]:
     if not settings.google_sheet_id or not settings.google_service_account_json_b64:
         return {"status": "skipped", "message": "Google Sheets is not configured."}
 
     decoded = base64.b64decode(settings.google_service_account_json_b64)
-    service_account_info: dict[str, Any] = json.loads(decoded)
+    service_account_info: Dict[str, Any] = json.loads(decoded)
     credentials = service_account.Credentials.from_service_account_info(
         service_account_info,
         scopes=SCOPES,

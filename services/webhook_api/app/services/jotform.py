@@ -1,13 +1,13 @@
 import json
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Dict, Optional
 
 from fastapi import HTTPException, Request, status
 
 from app.schemas import NormalizedJotformPayload
 
 
-async def parse_request_payload(request: Request) -> dict[str, Any]:
+async def parse_request_payload(request: Request) -> Dict[str, Any]:
     content_type = request.headers.get("content-type", "")
 
     if "application/json" in content_type:
@@ -32,7 +32,7 @@ async def parse_request_payload(request: Request) -> dict[str, Any]:
     return data
 
 
-def normalize_jotform_payload(payload: dict[str, Any]) -> NormalizedJotformPayload:
+def normalize_jotform_payload(payload: Dict[str, Any]) -> NormalizedJotformPayload:
     flat = _flatten_payload(payload)
 
     return NormalizedJotformPayload(
@@ -45,7 +45,7 @@ def normalize_jotform_payload(payload: dict[str, Any]) -> NormalizedJotformPaylo
     )
 
 
-def _flatten_payload(payload: dict[str, Any]) -> dict[str, Any]:
+def _flatten_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     flat = dict(payload)
     answers = payload.get("answers")
     if isinstance(answers, dict):
@@ -59,7 +59,7 @@ def _flatten_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return flat
 
 
-def _pick(payload: dict[str, Any], *keys: str) -> str | None:
+def _pick(payload: Dict[str, Any], *keys: str) -> Optional[str]:
     lower_lookup = {str(key).lower(): value for key, value in payload.items()}
     for key in keys:
         value = payload.get(key)
@@ -70,7 +70,7 @@ def _pick(payload: dict[str, Any], *keys: str) -> str | None:
     return None
 
 
-def _money(value: str | None) -> Decimal | None:
+def _money(value: Optional[str]) -> Optional[Decimal]:
     if not value:
         return None
     cleaned = "".join(char for char in value if char.isdigit() or char == ".")

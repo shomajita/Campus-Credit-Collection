@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -32,16 +33,16 @@ class JotformSubmission(TimestampMixin, Base):
         default=uuid.uuid4,
     )
     source: Mapped[str] = mapped_column(String(40), default="jotform", nullable=False)
-    submission_id: Mapped[str | None] = mapped_column(
+    submission_id: Mapped[Optional[str]] = mapped_column(
         String(128),
         unique=True,
         index=True,
         nullable=True,
     )
-    applicant_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    applicant_email: Mapped[str | None] = mapped_column(String(254), nullable=True)
-    applicant_phone: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    loan_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    applicant_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    applicant_email: Mapped[Optional[str]] = mapped_column(String(254), nullable=True)
+    applicant_phone: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    loan_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="received", nullable=False)
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
@@ -62,4 +63,4 @@ class SyncEvent(TimestampMixin, Base):
     )
     target: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False)
-    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

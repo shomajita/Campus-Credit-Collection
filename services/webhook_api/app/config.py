@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,10 +16,10 @@ class Settings(BaseSettings):
     database_url: str = Field(alias="DATABASE_URL")
     database_ssl: bool = Field(default=True, alias="DATABASE_SSL")
     jotform_webhook_secret: str = Field(alias="JOTFORM_WEBHOOK_SECRET")
-    admin_api_key: str | None = Field(default=None, alias="ADMIN_API_KEY")
-    google_sheet_id: str | None = Field(default=None, alias="GOOGLE_SHEET_ID")
+    admin_api_key: Optional[str] = Field(default=None, alias="ADMIN_API_KEY")
+    google_sheet_id: Optional[str] = Field(default=None, alias="GOOGLE_SHEET_ID")
     google_sheet_tab: str = Field(default="Loans", alias="GOOGLE_SHEET_TAB")
-    google_service_account_json_b64: str | None = Field(
+    google_service_account_json_b64: Optional[str] = Field(
         default=None,
         alias="GOOGLE_SERVICE_ACCOUNT_JSON_B64",
     )

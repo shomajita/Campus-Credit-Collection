@@ -1,4 +1,5 @@
 import secrets
+from typing import Optional
 
 from fastapi import HTTPException, status
 
@@ -7,8 +8,8 @@ from app.config import Settings
 
 def verify_webhook_secret(
     settings: Settings,
-    header_secret: str | None,
-    query_token: str | None,
+    header_secret: Optional[str],
+    query_token: Optional[str],
 ) -> None:
     provided = header_secret or query_token or ""
     if not secrets.compare_digest(provided, settings.jotform_webhook_secret):
@@ -18,7 +19,7 @@ def verify_webhook_secret(
         )
 
 
-def ensure_admin_key(settings: Settings, header_key: str | None) -> None:
+def ensure_admin_key(settings: Settings, header_key: Optional[str]) -> None:
     if not settings.admin_api_key:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
