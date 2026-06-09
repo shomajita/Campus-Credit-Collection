@@ -158,7 +158,7 @@ Start Command: cd services/webhook_api && uvicorn app.main:app --host 0.0.0.0 --
 Health Check Path: /healthz
 ```
 
-Set `DATABASE_URL` in Render to your rotated Railway PostgreSQL connection string. Do not commit the real Railway URL to GitHub. Full setup instructions are in `services/webhook_api/README.md`.
+Set `DATABASE_URL` in Render to your rotated Railway public/proxy PostgreSQL connection string. Do not use the private `postgres.railway.internal` URL, and do not commit the real Railway URL to GitHub. Full setup instructions are in `services/webhook_api/README.md`.
 
 ## Production Notes
 
