@@ -61,6 +61,8 @@ services:
     startCommand: cd services/webhook_api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_SSL

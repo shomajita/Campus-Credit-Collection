@@ -98,6 +98,8 @@ Use a paid Render web service plan with a persistent disk. Render's normal servi
 
 The Blueprint also defines a separate `stucha-webhook-api` Python service for Railway PostgreSQL/Jotform webhooks. If you apply the Blueprint, Render will ask you to fill the secrets marked `sync: false`, including `DATABASE_URL`.
 
+The webhook service is pinned to Python `3.12.13` through `.python-version` and `PYTHON_VERSION`. This avoids compatibility problems with Render's newer default Python runtime.
+
 Recommended Render settings:
 
 ```text
