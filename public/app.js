@@ -40,7 +40,15 @@ const moneyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2
 });
 
+const motionState = {
+  reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  numberAnimations: new WeakMap(),
+  observer: null
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
+  bindNavigationExperience();
+  initMotion();
   bindTabs();
   bindCalculator();
   bindForms();
@@ -57,6 +65,91 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindTabs() {
   document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
+  });
+}
+
+function bindNavigationExperience() {
+  const topbar = document.querySelector(".topbar");
+  const navToggle = document.querySelector("#nav-toggle");
+  const progress = document.querySelector("#scroll-progress-bar");
+
+  const updateScrollUI = () => {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const scrollable = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+    topbar.classList.toggle("scrolled", scrollTop > 14);
+    progress.style.transform = `scaleX(${Math.min(scrollTop / scrollable, 1)})`;
+  };
+
+  navToggle.addEventListener("click", () => {
+    const open = topbar.classList.toggle("nav-open");
+    navToggle.setAttribute("aria-expanded", String(open));
+    navToggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+  });
+
+  document.querySelectorAll(".tabs [data-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      topbar.classList.remove("nav-open");
+      navToggle.setAttribute("aria-expanded", "false");
+      navToggle.setAttribute("aria-label", "Open navigation");
+    });
+  });
+
+  window.addEventListener("scroll", updateScrollUI, { passive: true });
+  window.addEventListener("resize", updateScrollUI);
+  updateScrollUI();
+}
+
+function initMotion() {
+  if (motionState.reduced || !("IntersectionObserver" in window)) {
+    document.querySelectorAll(".reveal-item").forEach((element) => element.classList.add("revealed"));
+    return;
+  }
+
+  document.documentElement.classList.add("motion-ready");
+  motionState.observer = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("revealed");
+      observer.unobserve(entry.target);
+    });
+  }, {
+    threshold: 0.12,
+    rootMargin: "0px 0px -7% 0px"
+  });
+
+  prepareRevealTargets();
+}
+
+function prepareRevealTargets(root = document) {
+  if (!motionState.observer) return;
+
+  const selectors = [
+    ".auth-card",
+    ".auth-side",
+    ".about-hero-copy > *",
+    ".hero-visual",
+    ".about-image-strip img",
+    ".about-section",
+    ".principle-list > div",
+    ".terms-grid > article",
+    ".faq-list > details",
+    "#loan-form > .section-heading",
+    "#loan-form > fieldset",
+    ".status-panel > *",
+    ".summary-strip > div",
+    ".settings-panel",
+    ".table-shell"
+  ];
+
+  const elements = root.querySelectorAll(selectors.join(","));
+  elements.forEach((element, index) => {
+    if (element.classList.contains("reveal-item")) return;
+    element.classList.add("reveal-item");
+    if (element.matches("img, .hero-visual, .summary-strip > div")) {
+      element.classList.add("reveal-scale");
+    }
+    element.style.setProperty("--reveal-delay", `${Math.min((index % 6) * 65, 325)}ms`);
+    motionState.observer.observe(element);
   });
 }
 
@@ -82,6 +175,10 @@ function activateTab(tabName) {
   if (tabName === "workers") setApplicantType("worker");
   if (tabName === "portal") setApplicantType("student");
   history.replaceState(null, "", tabName === "admin" ? "#admin" : tabName === "workers" ? "#workers" : tabName === "about" ? "#about" : "#portal");
+  if (window.scrollY > 24) {
+    window.scrollTo({ top: 0, behavior: motionState.reduced ? "auto" : "smooth" });
+  }
+  window.requestAnimationFrame(() => prepareRevealTargets());
 
   if (tabName === "admin") {
     showDashboard();
@@ -237,10 +334,10 @@ function updateCalculator() {
   const total = roundMoney(amount + interest);
   const dueDisplay = formatDisplayDate(state.config.repaymentDueDate);
 
-  document.querySelector("#interest-amount").textContent = formatMoney(interest);
-  document.querySelector("#total-repayment").textContent = formatMoney(total);
+  animateNumber("#interest-amount", interest, formatMoney);
+  animateNumber("#total-repayment", total, formatMoney);
   document.querySelector("#due-date").textContent = dueDisplay;
-  document.querySelector("#summary-principal").textContent = formatMoney(amount);
+  animateNumber("#summary-principal", amount, formatMoney);
   document.querySelector("#summary-interest-rate").textContent = `${Math.round(terms.rate * 100)}%`;
   document.querySelector("#summary-category").textContent = terms.label.replace(/\s*\([^)]*\)/, "");
   document.querySelector("#summary-due-date").textContent = dueDisplay;
@@ -580,6 +677,7 @@ function showAuth(mode = "client") {
   });
   setAuthMode(mode);
   history.replaceState(null, "", mode === "admin" ? "#admin-login" : "#login");
+  window.requestAnimationFrame(() => prepareRevealTargets());
 }
 
 function setAuthMode(mode) {
@@ -665,6 +763,8 @@ function renderQueue() {
   body.querySelectorAll("[data-reject]").forEach((button) => {
     button.addEventListener("click", () => rejectApplication(button.dataset.reject, button));
   });
+
+  animateTableRows(body);
 }
 
 function nextOfKinDetails(application) {
@@ -703,10 +803,10 @@ function updateSummary() {
     .filter((item) => item.status === "Approved")
     .reduce((sum, item) => sum + Number(item.totalRepayment || 0), 0);
 
-  document.querySelector("#pending-count").textContent = pending;
-  document.querySelector("#approved-count").textContent = approved;
-  document.querySelector("#amount-out-total").textContent = formatMoney(amountOut);
-  document.querySelector("#amount-in-total").textContent = formatMoney(amountIn);
+  animateNumber("#pending-count", pending, (value) => String(Math.round(value)));
+  animateNumber("#approved-count", approved, (value) => String(Math.round(value)));
+  animateNumber("#amount-out-total", amountOut, formatMoney);
+  animateNumber("#amount-in-total", amountIn, formatMoney);
 }
 
 function setApplicantType(type) {
@@ -946,6 +1046,53 @@ function setMessage(selector, text, tone) {
   element.textContent = text;
   element.classList.toggle("success", tone === "success");
   element.classList.toggle("error", tone === "error");
+}
+
+function animateNumber(selector, target, formatter) {
+  const element = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!element) return;
+
+  const numericTarget = Number(target || 0);
+  const previous = Number(element.dataset.numericValue);
+  const start = Number.isFinite(previous) ? previous : numericTarget;
+  element.dataset.numericValue = String(numericTarget);
+
+  const running = motionState.numberAnimations.get(element);
+  if (running) cancelAnimationFrame(running);
+
+  if (motionState.reduced || Math.abs(numericTarget - start) < 0.005) {
+    element.textContent = formatter(numericTarget);
+    return;
+  }
+
+  const duration = 420;
+  const startedAt = performance.now();
+  element.classList.remove("metric-value-updating");
+  void element.offsetWidth;
+  element.classList.add("metric-value-updating");
+
+  const tick = (now) => {
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = formatter(start + (numericTarget - start) * eased);
+
+    if (progress < 1) {
+      motionState.numberAnimations.set(element, requestAnimationFrame(tick));
+    } else {
+      element.textContent = formatter(numericTarget);
+      motionState.numberAnimations.delete(element);
+    }
+  };
+
+  motionState.numberAnimations.set(element, requestAnimationFrame(tick));
+}
+
+function animateTableRows(body) {
+  if (motionState.reduced) return;
+  body.querySelectorAll("tr").forEach((row, index) => {
+    row.classList.add("row-enter");
+    row.style.setProperty("--row-delay", `${Math.min(index * 45, 360)}ms`);
+  });
 }
 
 function clampMoney(value) {
