@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>STUCHA Enterprise</title>
-    <link rel="stylesheet" href="/styles.css?v=20260616-enterprise4">
+    <link rel="stylesheet" href="/styles.css?v=20260616-enterprise5">
   </head>
   <body>
     <div class="scroll-progress" aria-hidden="true">
@@ -28,12 +28,35 @@
         </button>
       </div>
       <nav id="primary-tabs" class="tabs" aria-label="Application sections">
-        <button class="tab" type="button" data-tab="about">Institutional History</button>
-        <button class="tab active" type="button" data-tab="portal">The Student Journey</button>
-        <button class="tab" type="button" data-tab="workers">Workforce Partnership</button>
-        <button class="tab" type="button" data-tab="admin">Institutional Control</button>
+        <button class="tab" type="button" data-tab="about">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          </span>
+          <span>Institutional History</span>
+        </button>
+        <button class="tab active" type="button" data-tab="portal">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m3 8 9-4 9 4-9 4-9-4Z"></path><path d="M7 10.2v5.1c0 1.5 2.2 2.7 5 2.7s5-1.2 5-2.7v-5.1"></path><path d="M21 8v5"></path></svg>
+          </span>
+          <span>The Student Journey</span>
+        </button>
+        <button class="tab" type="button" data-tab="workers">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m8.5 12.5 2 2a3 3 0 0 0 4.2 0l1.8-1.8"></path><path d="m14 7 1.2-1.2a3 3 0 0 1 4.2 0l1.8 1.8-5.7 5.7"></path><path d="m10 7-1.2-1.2a3 3 0 0 0-4.2 0L2.8 7.6l7.8 7.8"></path><path d="m7 14 2 2"></path><path d="m5 16 2 2"></path></svg>
+          </span>
+          <span>Workforce Partnership</span>
+        </button>
+        <button class="tab" type="button" data-tab="admin">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.6 2.9 8 7 10 4.1-2 7-5.4 7-10V6l-7-3Z"></path></svg>
+          </span>
+          <span>Institutional Control</span>
+        </button>
       </nav>
-      <button id="session-logout" class="topbar-logout hidden" type="button">Log Out</button>
+      <button id="session-logout" class="topbar-logout hidden" type="button">
+        <svg class="logout-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+        <span>Log Out</span>
+      </button>
       <div class="sidebar-foot" aria-label="STUCHA status">
         <span>KYC</span>
         <span>Audit Trail</span>
@@ -606,6 +629,6 @@
       </section>
     </main>
 
-    <script src="/app.js?v=20260616-enterprise4"></script>
+    <script src="/app.js?v=20260616-enterprise5"></script>
   </body>
 </html>

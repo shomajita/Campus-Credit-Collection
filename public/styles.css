@@ -2868,3 +2868,69 @@ tbody tr:hover td {
     font-size: 14px;
   }
 }
+
+.tab::before {
+  content: none !important;
+  display: none !important;
+}
+
+.tab {
+  gap: 14px;
+}
+
+.tab > span:last-child {
+  min-width: 0;
+}
+
+.nav-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #d7d0c7;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.045)),
+    rgba(255, 255, 255, 0.035);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 20px rgba(0, 0, 0, 0.2);
+  flex: 0 0 auto;
+}
+
+.nav-icon svg,
+.logout-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab:hover .nav-icon,
+.tab.active .nav-icon {
+  color: var(--enterprise-text);
+  border-color: rgba(197, 165, 106, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.055)),
+    rgba(255, 255, 255, 0.055);
+}
+
+.topbar-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 16px;
+}
+
+.logout-icon {
+  width: 21px;
+  height: 21px;
+  color: #d7d0c7;
+  stroke-width: 1.9;
+}
