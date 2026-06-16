@@ -516,7 +516,7 @@ input[type="range"] {
 }
 
 .summary-strip {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 
@@ -1033,7 +1033,8 @@ button:disabled {
   margin-bottom: 16px;
 }
 
-.settings-panel summary {
+.settings-panel summary,
+.submissions-panel summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1042,11 +1043,13 @@ button:disabled {
   list-style: none;
 }
 
-.settings-panel summary::-webkit-details-marker {
+.settings-panel summary::-webkit-details-marker,
+.submissions-panel summary::-webkit-details-marker {
   display: none;
 }
 
-.settings-panel summary::after {
+.settings-panel summary::after,
+.fold-indicator {
   content: "+";
   display: grid;
   width: 30px;
@@ -1060,22 +1063,26 @@ button:disabled {
   flex: 0 0 auto;
 }
 
-.settings-panel[open] summary {
+.settings-panel[open] summary,
+.submissions-panel[open] summary {
   margin-bottom: 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
-.settings-panel[open] summary::after {
+.settings-panel[open] summary::after,
+.submissions-panel[open] .fold-indicator {
   content: "-";
 }
 
-.settings-panel summary .eyebrow {
+.settings-panel summary .eyebrow,
+.submissions-panel summary .eyebrow {
   display: block;
   margin-bottom: 4px;
 }
 
-.settings-panel summary strong {
+.settings-panel summary strong,
+.submissions-panel summary strong {
   display: block;
   color: var(--navy-950);
   font-size: 16px;
@@ -1094,6 +1101,91 @@ button:disabled {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
+}
+
+.submissions-panel {
+  padding: 18px;
+  overflow: hidden;
+}
+
+.submissions-panel summary small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.queue-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.queue-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.queue-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #52647b;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 10px 20px rgba(6, 18, 33, 0.06);
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+.queue-filter span {
+  display: grid;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--navy-950);
+  background: var(--soft-blue);
+  font-size: 12px;
+}
+
+.queue-filter:hover,
+.queue-filter.active {
+  color: var(--navy-950);
+  border-color: rgba(36, 184, 164, 0.42);
+  background: var(--teal-100);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.queue-filter.active span {
+  color: var(--white);
+  background: var(--teal-600);
+}
+
+.queue-filter[data-queue-filter="Rejected"].active {
+  border-color: rgba(194, 60, 74, 0.28);
+  background: #fff0f2;
+}
+
+.queue-filter[data-queue-filter="Rejected"].active span {
+  background: var(--red-600);
 }
 
 .table-shell {
@@ -1136,6 +1228,18 @@ td {
 
 tbody tr:hover td {
   background: #f7fbff;
+}
+
+.queue-row.status-pending td:first-child {
+  box-shadow: inset 4px 0 0 var(--gold-500);
+}
+
+.queue-row.status-approved td:first-child {
+  box-shadow: inset 4px 0 0 var(--green-600);
+}
+
+.queue-row.status-rejected td:first-child {
+  box-shadow: inset 4px 0 0 var(--red-600);
 }
 
 .empty-state {
@@ -1320,6 +1424,21 @@ tbody tr:hover td {
 
   .settings-panel summary {
     align-items: flex-start;
+  }
+
+  .submissions-panel summary {
+    align-items: flex-start;
+  }
+
+  .queue-filter-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .queue-filter {
+    width: 100%;
+    padding-right: 10px;
+    padding-left: 10px;
   }
 
   .settings-hint {

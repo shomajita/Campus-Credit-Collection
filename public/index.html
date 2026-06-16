@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>STUCHA Loan Management</title>
-    <link rel="stylesheet" href="/styles.css?v=20260615-motion2">
+    <link rel="stylesheet" href="/styles.css?v=20260616-adminqueue1">
   </head>
   <body>
     <div class="scroll-progress" aria-hidden="true">
@@ -531,6 +531,10 @@
               <strong id="approved-count">0</strong>
             </div>
             <div>
+              <span>Rejected</span>
+              <strong id="rejected-count">0</strong>
+            </div>
+            <div>
               <span>Amount Out</span>
               <strong id="amount-out-total">P 0.00</strong>
             </div>
@@ -540,39 +544,67 @@
             </div>
           </div>
 
-          <div class="table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>Approve</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Name</th>
-                  <th>Applicant ID</th>
-                  <th>Phone</th>
-                  <th>Next of Kin</th>
-                  <th>Category</th>
-                  <th>Amount</th>
-                  <th>Total In</th>
-                  <th>Due</th>
-                  <th>Documents</th>
-                  <th>Location</th>
-                  <th>Declaration</th>
-                  <th>Status</th>
-                  <th>Spreadsheet</th>
-                </tr>
-              </thead>
-              <tbody id="queue-body">
-                <tr>
-                  <td colspan="16" class="empty-state">Log in to load applications.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <details id="submissions-panel" class="panel submissions-panel" open>
+            <summary>
+              <span>
+                <span class="eyebrow">Loan Submissions</span>
+                <strong id="submissions-title">Pending Applications</strong>
+                <small id="submissions-count-label">0 applications in this view</small>
+              </span>
+              <span class="fold-indicator" aria-hidden="true"></span>
+            </summary>
+
+            <div class="queue-toolbar" aria-label="Application status filters">
+              <div class="queue-filter-group" role="tablist" aria-label="Loan application status">
+                <button class="queue-filter active" type="button" role="tab" aria-selected="true" data-queue-filter="Pending">
+                  Pending <span id="pending-filter-count">0</span>
+                </button>
+                <button class="queue-filter" type="button" role="tab" aria-selected="false" data-queue-filter="Approved">
+                  Approved <span id="approved-filter-count">0</span>
+                </button>
+                <button class="queue-filter" type="button" role="tab" aria-selected="false" data-queue-filter="Rejected">
+                  Rejected <span id="rejected-filter-count">0</span>
+                </button>
+                <button class="queue-filter" type="button" role="tab" aria-selected="false" data-queue-filter="All">
+                  All <span id="all-filter-count">0</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Approve</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Applicant ID</th>
+                    <th>Phone</th>
+                    <th>Next of Kin</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Total In</th>
+                    <th>Due</th>
+                    <th>Documents</th>
+                    <th>Location</th>
+                    <th>Declaration</th>
+                    <th>Status</th>
+                    <th>Spreadsheet</th>
+                  </tr>
+                </thead>
+                <tbody id="queue-body">
+                  <tr>
+                    <td colspan="16" class="empty-state">Log in to load applications.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </div>
       </section>
     </main>
 
-    <script src="/app.js?v=20260615-motion2"></script>
+    <script src="/app.js?v=20260616-adminqueue1"></script>
   </body>
 </html>

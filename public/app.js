@@ -25,6 +25,7 @@ const state = {
   },
   csrfToken: "",
   pendingTab: "portal",
+  queueFilter: "Pending",
   applications: [],
   signature: {
     drawing: false,
@@ -138,6 +139,8 @@ function prepareRevealTargets(root = document) {
     ".status-panel > *",
     ".summary-strip > div",
     ".settings-panel",
+    ".submissions-panel",
+    ".queue-filter",
     ".table-shell"
   ];
 
@@ -218,9 +221,24 @@ function bindForms() {
   document.querySelector("#session-logout").addEventListener("click", logout);
   document.querySelector("#refresh-queue").addEventListener("click", loadQueue);
   document.querySelector("#rebuild-spreadsheet").addEventListener("click", rebuildSpreadsheet);
+  bindAdminQueueControls();
   document.querySelectorAll("#loan-form input[type='file']").forEach((input) => {
     input.addEventListener("change", () => validateSelectedFiles(input.form, true));
   });
+}
+
+function bindAdminQueueControls() {
+  document.querySelectorAll("[data-queue-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.queueFilter = button.dataset.queueFilter || "Pending";
+      renderQueue();
+    });
+  });
+
+  const panel = document.querySelector("#submissions-panel");
+  if (panel) {
+    panel.addEventListener("toggle", updateQueueControls);
+  }
 }
 
 function bindLocation() {
@@ -697,7 +715,7 @@ function updateLogoutVisibility() {
 
 async function loadQueue() {
   const body = document.querySelector("#queue-body");
-    body.innerHTML = `<tr><td colspan="16" class="empty-state">Loading applications...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="16" class="empty-state">Loading applications...</td></tr>`;
 
   try {
     const response = await fetch("/api/admin/applications");
@@ -706,23 +724,31 @@ async function loadQueue() {
     state.applications = result.applications;
     renderQueue();
   } catch (error) {
-      body.innerHTML = `<tr><td colspan="16" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="16" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
+    updateQueueControls();
   }
 }
 
 function renderQueue() {
   const body = document.querySelector("#queue-body");
+  const visibleApplications = getFilteredApplications();
   updateSummary();
+  updateQueueControls();
 
   if (!state.applications.length) {
     body.innerHTML = `<tr><td colspan="16" class="empty-state">No applications yet.</td></tr>`;
     return;
   }
 
-  body.innerHTML = state.applications.map((application) => `
-    <tr>
+  if (!visibleApplications.length) {
+    body.innerHTML = `<tr><td colspan="16" class="empty-state">No ${state.queueFilter.toLowerCase()} applications in this view.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = visibleApplications.map((application) => `
+    <tr class="queue-row status-${normalizeApplicationStatus(application).toLowerCase()}">
       <td>
-        <input class="approve-check" type="checkbox" aria-label="Approve ${escapeHtml(application.fullName)}" data-approve="${application.id}" ${application.status === "Approved" ? "checked disabled" : ""}>
+        <input class="approve-check" type="checkbox" aria-label="Approve ${escapeHtml(application.fullName)}" data-approve="${application.id}" ${application.status === "Approved" ? "checked disabled" : application.status === "Rejected" ? "disabled" : ""}>
       </td>
       <td>${formatDateTime(application.submittedAt)}</td>
       <td>${escapeHtml(application.applicantTypeLabel || "Student")}</td>
@@ -767,6 +793,63 @@ function renderQueue() {
   animateTableRows(body);
 }
 
+function getFilteredApplications() {
+  if (state.queueFilter === "All") return state.applications;
+  return state.applications.filter((application) => normalizeApplicationStatus(application) === state.queueFilter);
+}
+
+function normalizeApplicationStatus(application) {
+  if (application.status === "Approved") return "Approved";
+  if (application.status === "Rejected") return "Rejected";
+  return "Pending";
+}
+
+function getQueueCounts() {
+  return state.applications.reduce(
+    (counts, application) => {
+      const status = normalizeApplicationStatus(application);
+      counts[status] += 1;
+      counts.All += 1;
+      return counts;
+    },
+    { Pending: 0, Approved: 0, Rejected: 0, All: 0 }
+  );
+}
+
+function updateQueueControls() {
+  const counts = getQueueCounts();
+  const currentCount = counts[state.queueFilter] || 0;
+  const title = document.querySelector("#submissions-title");
+  const label = document.querySelector("#submissions-count-label");
+
+  if (title) {
+    title.textContent = state.queueFilter === "All" ? "All Applications" : `${state.queueFilter} Applications`;
+  }
+
+  if (label) {
+    const noun = currentCount === 1 ? "application" : "applications";
+    label.textContent = `${currentCount} ${noun} in this view`;
+  }
+
+  const filterMap = {
+    Pending: "#pending-filter-count",
+    Approved: "#approved-filter-count",
+    Rejected: "#rejected-filter-count",
+    All: "#all-filter-count"
+  };
+
+  Object.entries(filterMap).forEach(([filter, selector]) => {
+    const count = document.querySelector(selector);
+    if (count) count.textContent = String(counts[filter] || 0);
+  });
+
+  document.querySelectorAll("[data-queue-filter]").forEach((button) => {
+    const active = button.dataset.queueFilter === state.queueFilter;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+}
+
 function nextOfKinDetails(application) {
   const motherName = application.motherKinName || application.nextOfKin?.mother?.name || "";
   const motherPhone = application.motherKinPhone || application.nextOfKin?.mother?.phone || "";
@@ -794,8 +877,7 @@ function documentLinks(application) {
 }
 
 function updateSummary() {
-  const pending = state.applications.filter((item) => item.status !== "Approved").length;
-  const approved = state.applications.filter((item) => item.status === "Approved").length;
+  const counts = getQueueCounts();
   const amountOut = state.applications
     .filter((item) => item.status === "Approved")
     .reduce((sum, item) => sum + Number(item.loanAmount || 0), 0);
@@ -803,8 +885,9 @@ function updateSummary() {
     .filter((item) => item.status === "Approved")
     .reduce((sum, item) => sum + Number(item.totalRepayment || 0), 0);
 
-  animateNumber("#pending-count", pending, (value) => String(Math.round(value)));
-  animateNumber("#approved-count", approved, (value) => String(Math.round(value)));
+  animateNumber("#pending-count", counts.Pending, (value) => String(Math.round(value)));
+  animateNumber("#approved-count", counts.Approved, (value) => String(Math.round(value)));
+  animateNumber("#rejected-count", counts.Rejected, (value) => String(Math.round(value)));
   animateNumber("#amount-out-total", amountOut, formatMoney);
   animateNumber("#amount-in-total", amountIn, formatMoney);
 }
