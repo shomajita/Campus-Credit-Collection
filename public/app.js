@@ -705,7 +705,7 @@ function setAuthMode(mode) {
   });
   document.querySelector("#client-login-form").classList.toggle("hidden", normalized !== "client");
   document.querySelector("#auth-admin-login-form").classList.toggle("hidden", normalized !== "admin");
-  document.querySelector("#auth-title").textContent = normalized === "admin" ? "Admin Login" : "Client Login";
+  document.querySelector("#auth-title").textContent = "Secure Enterprise Login";
 }
 
 function updateLogoutVisibility() {
