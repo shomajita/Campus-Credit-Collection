@@ -293,6 +293,18 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/admin/notifications/status") {
+    requireAdmin(req);
+    sendJson(res, 200, getNotificationStatus());
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/notifications/test") {
+    requireCsrf(req);
+    await testNotifications(res);
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/admin/credentials") {
     requireCsrf(req);
     await updateAdminCredentials(req, res);
@@ -624,6 +636,88 @@ async function loginAdmin(req, res) {
   sessions.set(sid, { type: "admin", username, csrfToken, expiresAt });
   setSessionCookie(res, sid);
   sendJson(res, 200, { ok: true, username, csrfToken });
+}
+
+async function testNotifications(res) {
+  const now = new Date().toISOString();
+  const testApplication = {
+    id: `TEST-${Date.now()}`,
+    submittedAt: now,
+    applicantType: "student",
+    applicantTypeLabel: "Student",
+    clientEmail: "test@stucha.local",
+    fullName: "STUCHA Test Applicant",
+    studentId: "TEST-ID",
+    phone: "+26700000000",
+    motherKinName: "",
+    motherKinPhone: "",
+    fatherKinName: "",
+    fatherKinPhone: "",
+    campusAddress: "Test campus address",
+    homeAddress: "Test home address",
+    googleMapsLocation: "",
+    loanAmount: 100,
+    loanCategory: "standard",
+    loanCategoryLabel: "Standard 30%",
+    interestRate: 0.3,
+    interestAmount: 30,
+    totalRepayment: 130,
+    repaymentDueDate: formatDate(calculateRepaymentDueDate(new Date())),
+    declarationAccepted: true,
+    documents: {},
+    status: "Pending"
+  };
+
+  const [whatsapp, email] = await Promise.all([
+    sendWhatsappNotification(testApplication),
+    sendEmailAlert(testApplication)
+  ]);
+
+  sendJson(res, 200, {
+    ok: true,
+    configured: getNotificationStatus(),
+    result: { whatsapp, email }
+  });
+}
+
+function getNotificationStatus() {
+  const whatsappTwilioReady = Boolean(
+    config.twilioAccountSid &&
+    config.twilioAuthToken &&
+    config.twilioWhatsappFrom &&
+    config.ownerWhatsappTo
+  );
+  const whatsappWebhookReady = Boolean(config.whatsappWebhookUrl);
+  const emailSendGridReady = Boolean(config.sendgridApiKey && config.ownerEmail && config.alertFromEmail);
+  const emailWebhookReady = Boolean(config.emailWebhookUrl);
+
+  return {
+    whatsapp: {
+      ready: whatsappTwilioReady || whatsappWebhookReady,
+      provider: whatsappTwilioReady ? "twilio" : whatsappWebhookReady ? "webhook" : "none",
+      destinationSet: Boolean(config.ownerWhatsappTo),
+      missing: notificationMissing([
+        ["OWNER_WHATSAPP_TO", config.ownerWhatsappTo],
+        ["TWILIO_ACCOUNT_SID or WHATSAPP_WEBHOOK_URL", config.twilioAccountSid || config.whatsappWebhookUrl],
+        ["TWILIO_AUTH_TOKEN", config.whatsappWebhookUrl || config.twilioAuthToken],
+        ["TWILIO_WHATSAPP_FROM", config.whatsappWebhookUrl || config.twilioWhatsappFrom]
+      ])
+    },
+    email: {
+      ready: emailSendGridReady || emailWebhookReady,
+      provider: emailSendGridReady ? "sendgrid" : emailWebhookReady ? "webhook" : "none",
+      destinationSet: Boolean(config.ownerEmail),
+      missing: notificationMissing([
+        ["OWNER_EMAIL", config.ownerEmail],
+        ["SENDGRID_API_KEY or EMAIL_WEBHOOK_URL", config.sendgridApiKey || config.emailWebhookUrl],
+        ["ALERT_FROM_EMAIL", config.emailWebhookUrl || config.alertFromEmail]
+      ])
+    }
+  };
+}
+
+function notificationMissing(entries) {
+  return entries.filter(([, value]) => !value).map(([name]) => name);
 }
 
 async function updateAdminCredentials(req, res) {

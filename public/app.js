@@ -186,6 +186,7 @@ function activateTab(tabName) {
   if (tabName === "admin") {
     showDashboard();
     loadAdminSettings();
+    loadNotificationStatus();
     loadQueue();
   }
 }
@@ -221,6 +222,7 @@ function bindForms() {
   document.querySelector("#session-logout").addEventListener("click", logout);
   document.querySelector("#refresh-queue").addEventListener("click", loadQueue);
   document.querySelector("#rebuild-spreadsheet").addEventListener("click", rebuildSpreadsheet);
+  document.querySelector("#test-notifications").addEventListener("click", testNotifications);
   bindAdminQueueControls();
   document.querySelectorAll("#loan-form input[type='file']").forEach((input) => {
     input.addEventListener("change", () => validateSelectedFiles(input.form, true));
@@ -659,6 +661,76 @@ async function loadAdminSettings() {
   }
 }
 
+async function loadNotificationStatus() {
+  try {
+    const response = await fetch("/api/admin/notifications/status");
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not load notification status.");
+    renderNotificationStatus(result);
+  } catch (error) {
+    document.querySelector("#notification-status").innerHTML = `
+      <div class="notification-card bad">
+        <span>Notification Status</span>
+        <strong>Unavailable</strong>
+        <small>${escapeHtml(error.message)}</small>
+      </div>
+    `;
+  }
+}
+
+async function testNotifications() {
+  const button = document.querySelector("#test-notifications");
+  button.disabled = true;
+  button.textContent = "Sending Test";
+  setMessage("#notification-message", "Sending test notification through configured providers...", "");
+
+  try {
+    const response = await fetch("/api/admin/notifications/test", {
+      method: "POST",
+      headers: { "X-CSRF-Token": state.csrfToken }
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Notification test failed.");
+    renderNotificationStatus(result.configured, result.result);
+    const whatsappStatus = result.result?.whatsapp?.status || "unknown";
+    const emailStatus = result.result?.email?.status || "unknown";
+    const tone = whatsappStatus === "sent" || emailStatus === "sent" ? "success" : "error";
+    setMessage("#notification-message", `Test complete. WhatsApp: ${whatsappStatus}. Email: ${emailStatus}.`, tone);
+  } catch (error) {
+    setMessage("#notification-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Send Test Notification";
+  }
+}
+
+function renderNotificationStatus(configured, testResult = null) {
+  const cards = [
+    notificationCard("WhatsApp", configured?.whatsapp, testResult?.whatsapp),
+    notificationCard("Email", configured?.email, testResult?.email)
+  ];
+  document.querySelector("#notification-status").innerHTML = cards.join("");
+}
+
+function notificationCard(label, configured = {}, result = null) {
+  const ready = Boolean(configured.ready);
+  const provider = configured.provider || "none";
+  const resultStatus = result?.status || "";
+  const tone = resultStatus === "sent" || (!result && ready) ? "good" : resultStatus === "failed" || !ready ? "bad" : "warn";
+  const missing = configured.missing?.length ? `Missing: ${configured.missing.join(", ")}` : "Ready to send";
+  const detail = result?.error || result?.message || missing;
+  const status = resultStatus || (ready ? "configured" : "not configured");
+
+  return `
+    <div class="notification-card ${tone}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(status)}</strong>
+      <small>Provider: ${escapeHtml(provider)}</small>
+      <small>${escapeHtml(detail)}</small>
+    </div>
+  `;
+}
+
 async function logout() {
   const token = state.admin.authenticated ? state.csrfToken : state.client.csrfToken;
   await fetch("/api/auth/logout", {
@@ -715,7 +787,7 @@ function updateLogoutVisibility() {
 
 async function loadQueue() {
   const body = document.querySelector("#queue-body");
-  body.innerHTML = `<tr><td colspan="16" class="empty-state">Loading applications...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="17" class="empty-state">Loading applications...</td></tr>`;
 
   try {
     const response = await fetch("/api/admin/applications");
@@ -724,7 +796,7 @@ async function loadQueue() {
     state.applications = result.applications;
     renderQueue();
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="16" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="17" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
     updateQueueControls();
   }
 }
@@ -736,12 +808,12 @@ function renderQueue() {
   updateQueueControls();
 
   if (!state.applications.length) {
-    body.innerHTML = `<tr><td colspan="16" class="empty-state">No applications yet.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="17" class="empty-state">No applications yet.</td></tr>`;
     return;
   }
 
   if (!visibleApplications.length) {
-    body.innerHTML = `<tr><td colspan="16" class="empty-state">No ${state.queueFilter.toLowerCase()} applications in this view.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="17" class="empty-state">No ${state.queueFilter.toLowerCase()} applications in this view.</td></tr>`;
     return;
   }
 
@@ -768,6 +840,7 @@ function renderQueue() {
         </div>
       </td>
       <td>${application.declarationAccepted ? '<span class="status-pill good">accepted</span>' : '<span class="status-pill bad">missing</span>'}</td>
+      <td>${notificationStatusStack(application)}</td>
       <td>
         <div class="status-stack">
           ${statusPill(application.status)}
@@ -791,6 +864,24 @@ function renderQueue() {
   });
 
   animateTableRows(body);
+}
+
+function notificationStatusStack(application) {
+  const whatsapp = application.notifications?.whatsapp || {};
+  const email = application.notifications?.email || {};
+  return `
+    <div class="status-stack">
+      ${notificationStatusPill("WA", whatsapp)}
+      ${notificationStatusPill("Email", email)}
+    </div>
+  `;
+}
+
+function notificationStatusPill(label, notification = {}) {
+  const status = notification.status || "pending";
+  const className = status === "sent" ? "good" : status === "failed" || status === "not_configured" ? "bad" : "warn";
+  const title = notification.error || notification.message || notification.provider || status;
+  return `<span class="status-pill ${className}" title="${escapeHtml(title)}">${escapeHtml(label)}: ${escapeHtml(status.replace(/_/g, " "))}</span>`;
 }
 
 function getFilteredApplications() {

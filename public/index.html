@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>STUCHA Enterprise</title>
-    <link rel="stylesheet" href="/styles.css?v=20260616-enterprise5">
+    <link rel="stylesheet" href="/styles.css?v=20260616-notify1">
   </head>
   <body>
     <div class="scroll-progress" aria-hidden="true">
@@ -568,6 +568,26 @@
             </div>
           </div>
 
+          <section class="panel notification-panel" aria-labelledby="notification-title">
+            <div>
+              <p class="eyebrow">Notification Channels</p>
+              <h2 id="notification-title">WhatsApp & Email Alerts</h2>
+              <p id="notification-help">Configure a sending provider in Render. Destination details alone cannot send alerts.</p>
+            </div>
+            <div id="notification-status" class="notification-status" aria-live="polite">
+              <div class="notification-card">
+                <span>WhatsApp</span>
+                <strong>Checking</strong>
+              </div>
+              <div class="notification-card">
+                <span>Email</span>
+                <strong>Checking</strong>
+              </div>
+            </div>
+            <button id="test-notifications" class="secondary-button" type="button">Send Test Notification</button>
+            <p id="notification-message" class="message" role="status"></p>
+          </section>
+
           <details id="submissions-panel" class="panel submissions-panel" open>
             <summary>
               <span>
@@ -613,13 +633,14 @@
                     <th>Documents</th>
                     <th>Location</th>
                     <th>Declaration</th>
+                    <th>Alerts</th>
                     <th>Status</th>
                     <th>Spreadsheet</th>
                   </tr>
                 </thead>
                 <tbody id="queue-body">
                   <tr>
-                    <td colspan="16" class="empty-state">Log in to load applications.</td>
+                    <td colspan="17" class="empty-state">Log in to load applications.</td>
                   </tr>
                 </tbody>
               </table>
@@ -629,6 +650,6 @@
       </section>
     </main>
 
-    <script src="/app.js?v=20260616-enterprise5"></script>
+    <script src="/app.js?v=20260616-notify1"></script>
   </body>
 </html>
