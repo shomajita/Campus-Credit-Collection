@@ -59,6 +59,14 @@ const loanCategories = [
   { id: "late-month", label: "Late Month 25%", rateKey: "lateInterestRate", startDay: 15, endDay: 31 }
 ];
 
+const yearOfStudyOptions = new Set(["Year 1", "Year 2", "Year 3", "Year 4", "Post-grad"]);
+const sponsorshipStatusOptions = new Set(["Sponsored", "Self-Sponsored"]);
+const collateralTypeOptions = new Set([
+  "Electronics (Smartphone, Laptop, Tablet)",
+  "Valuable Personal Item",
+  "Other Asset"
+]);
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -330,7 +338,7 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const fileMatch = url.pathname.match(/^\/api\/admin\/applications\/([^/]+)\/files\/(identity|student|photo|signature)$/);
+  const fileMatch = url.pathname.match(/^\/api\/admin\/applications\/([^/]+)\/files\/(identity|student|photo|signature|sponsorship)$/);
   if (fileMatch && req.method === "GET") {
     requireAdmin(req);
     await sendProtectedFile(res, fileMatch[1], fileMatch[2]);
@@ -369,7 +377,7 @@ async function handleRequest(req, res) {
 async function createApplication(req, res) {
   const clientSession = requireClient(req);
   const contentLength = Number(req.headers["content-length"] || 0);
-  const maxBodyBytes = config.maxFileBytes * 3 + 2 * 1024 * 1024;
+  const maxBodyBytes = config.maxFileBytes * 4 + 2 * 1024 * 1024;
   if (contentLength > maxBodyBytes) {
     throw httpError(413, `Total upload size cannot exceed ${Math.round(maxBodyBytes / 1024 / 1024)}MB.`);
   }
@@ -386,6 +394,15 @@ async function createApplication(req, res) {
     motherKinPhone: cleanText(form.get("motherKinPhone"), 30),
     fatherKinName: cleanText(form.get("fatherKinName"), 120),
     fatherKinPhone: cleanText(form.get("fatherKinPhone"), 30),
+    spouseName: cleanText(form.get("spouse_name") || form.get("spouseName"), 120),
+    spouseContact: cleanText(form.get("spouse_contact") || form.get("spouseContact"), 30),
+    placeOfWork: cleanText(form.get("place_of_work") || form.get("placeOfWork"), 160),
+    employerContactNumber: cleanText(form.get("employer_contact_number") || form.get("employerContactNumber"), 30),
+    incomeDate: cleanText(form.get("income_date") || form.get("incomeDate"), 2),
+    yearOfStudy: cleanText(form.get("year_of_study") || form.get("yearOfStudy"), 40),
+    sponsorshipStatus: cleanText(form.get("sponsorship_status") || form.get("sponsorshipStatus"), 40),
+    collateralType: cleanText(form.get("collateral_type") || form.get("collateralType"), 80),
+    collateralDescription: cleanText(form.get("collateral_description") || form.get("collateralDescription"), 500),
     campusAddress: cleanText(form.get("campusAddress"), 300),
     homeAddress: cleanText(form.get("homeAddress"), 300),
     googleMapsLocation: cleanText(form.get("googleMapsLocation"), 500),
@@ -400,10 +417,16 @@ async function createApplication(req, res) {
   const identityFile = form.get("identityDocument");
   const studentFile = form.get("studentDocument");
   const photoFile = form.get("clientPhoto");
+  const sponsorshipFile = form.get("proof_of_sponsorship") || form.get("proofOfSponsorship");
 
   if (!isUploadFile(identityFile)) errors.push("Identity document photo is required.");
-  if (!isUploadFile(studentFile)) errors.push("Student ID photo is required.");
+  if (!isUploadFile(studentFile)) {
+    errors.push(input.applicantType === "worker" ? "Payslip or employment proof is required." : "Student ID photo is required.");
+  }
   if (!isUploadFile(photoFile)) errors.push("Client photo is required.");
+  if (input.applicantType === "student" && input.sponsorshipStatus === "Sponsored" && !isUploadFile(sponsorshipFile)) {
+    errors.push("Proof of sponsorship is required for sponsored students.");
+  }
   if (!input.signatureData) errors.push("Client signature is required.");
 
   if (errors.length) {
@@ -415,6 +438,9 @@ async function createApplication(req, res) {
   const identityDocument = await storeUpload(applicationId, "identity", identityFile);
   const studentDocument = await storeUpload(applicationId, "student", studentFile);
   const clientPhoto = await storeUpload(applicationId, "photo", photoFile, { imageOnly: true });
+  const sponsorshipDocument = isUploadFile(sponsorshipFile)
+    ? await storeUpload(applicationId, "sponsorship", sponsorshipFile)
+    : null;
   const signatureDocument = await storeSignature(applicationId, input.signatureData);
   const interestAmount = roundMoney(input.loanAmount * terms.rate);
   const totalRepayment = roundMoney(input.loanAmount + interestAmount);
@@ -434,6 +460,30 @@ async function createApplication(req, res) {
     motherKinPhone: input.motherKinPhone,
     fatherKinName: input.fatherKinName,
     fatherKinPhone: input.fatherKinPhone,
+    spouseName: input.spouseName,
+    spouseContact: input.spouseContact,
+    placeOfWork: input.placeOfWork,
+    employerContactNumber: input.employerContactNumber,
+    incomeDate: input.incomeDate,
+    yearOfStudy: input.yearOfStudy,
+    sponsorshipStatus: input.sponsorshipStatus,
+    collateralType: input.collateralType,
+    collateralDescription: input.collateralDescription,
+    employment: input.applicantType === "worker" ? {
+      placeOfWork: input.placeOfWork,
+      employerContactNumber: input.employerContactNumber,
+      incomeDate: input.incomeDate,
+      spouseName: input.spouseName,
+      spouseContact: input.spouseContact
+    } : null,
+    academic: input.applicantType === "student" ? {
+      yearOfStudy: input.yearOfStudy,
+      sponsorshipStatus: input.sponsorshipStatus
+    } : null,
+    collateral: input.applicantType === "student" ? {
+      type: input.collateralType,
+      description: input.collateralDescription
+    } : null,
     nextOfKin: {
       mother: {
         name: input.motherKinName,
@@ -462,6 +512,7 @@ async function createApplication(req, res) {
       identity: identityDocument,
       student: studentDocument,
       photo: clientPhoto,
+      sponsorship: sponsorshipDocument,
       signature: signatureDocument
     },
     notifications: {
@@ -923,6 +974,16 @@ function localSpreadsheetHeaders() {
     "Mother Phone",
     "Next of Kin Father",
     "Father Phone",
+    "Spouse Name",
+    "Spouse Contact",
+    "Place of Work",
+    "Employer Contact Number",
+    "Income Date",
+    "Year of Study",
+    "Sponsorship Status",
+    "Proof of Sponsorship Link",
+    "Collateral Type",
+    "Collateral Description",
     "Current Campus/Workplace Address",
     "Home Address",
     "Google Maps Location",
@@ -959,6 +1020,16 @@ function toLocalSpreadsheetRow(application) {
     application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
     application.fatherKinName || application.nextOfKin?.father?.name || "",
     application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
+    application.spouseName || application.employment?.spouseName || "",
+    application.spouseContact || application.employment?.spouseContact || "",
+    application.placeOfWork || application.employment?.placeOfWork || "",
+    application.employerContactNumber || application.employment?.employerContactNumber || "",
+    application.incomeDate || application.employment?.incomeDate || "",
+    application.yearOfStudy || application.academic?.yearOfStudy || "",
+    application.sponsorshipStatus || application.academic?.sponsorshipStatus || "",
+    links.sponsorship,
+    application.collateralType || application.collateral?.type || "",
+    application.collateralDescription || application.collateral?.description || "",
     application.campusAddress,
     application.homeAddress,
     application.googleMapsLocation || "",
@@ -988,6 +1059,7 @@ function protectedDocumentLinks(application) {
     photo: documents.photo ? `${base}/photo` : "",
     identity: documents.identity ? `${base}/identity` : "",
     student: documents.student ? `${base}/student` : "",
+    sponsorship: documents.sponsorship ? `${base}/sponsorship` : "",
     signature: documents.signature ? `${base}/signature` : ""
   };
 }
@@ -1058,6 +1130,15 @@ async function sendEmailAlert(application) {
     `Mother Phone: ${application.motherKinPhone || application.nextOfKin?.mother?.phone || ""}`,
     `Next of Kin (Father): ${application.fatherKinName || application.nextOfKin?.father?.name || ""}`,
     `Father Phone: ${application.fatherKinPhone || application.nextOfKin?.father?.phone || ""}`,
+    `Spouse Name: ${application.spouseName || ""}`,
+    `Spouse Contact: ${application.spouseContact || ""}`,
+    `Place of Work: ${application.placeOfWork || application.employment?.placeOfWork || ""}`,
+    `Employer Contact: ${application.employerContactNumber || application.employment?.employerContactNumber || ""}`,
+    `Income Date: ${application.incomeDate || application.employment?.incomeDate || ""}`,
+    `Year of Study: ${application.yearOfStudy || application.academic?.yearOfStudy || ""}`,
+    `Sponsorship Status: ${application.sponsorshipStatus || application.academic?.sponsorshipStatus || ""}`,
+    `Collateral Type: ${application.collateralType || application.collateral?.type || ""}`,
+    `Collateral Description: ${application.collateralDescription || application.collateral?.description || ""}`,
     `Current Campus/Workplace Address: ${application.campusAddress}`,
     `Home Address: ${application.homeAddress}`,
     `Google Maps Location: ${application.googleMapsLocation}`,
@@ -1110,6 +1191,7 @@ async function sendEmailAlert(application) {
             identity: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/identity`,
             student: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/student`,
             photo: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/photo`,
+            sponsorship: application.documents?.sponsorship ? `${config.publicAppUrl}/api/admin/applications/${application.id}/files/sponsorship` : "",
             signature: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/signature`
           }
         })
@@ -1238,6 +1320,15 @@ function notificationApplicationSummary(application) {
     motherKinPhone: application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
     fatherKinName: application.fatherKinName || application.nextOfKin?.father?.name || "",
     fatherKinPhone: application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
+    spouseName: application.spouseName || application.employment?.spouseName || "",
+    spouseContact: application.spouseContact || application.employment?.spouseContact || "",
+    placeOfWork: application.placeOfWork || application.employment?.placeOfWork || "",
+    employerContactNumber: application.employerContactNumber || application.employment?.employerContactNumber || "",
+    incomeDate: application.incomeDate || application.employment?.incomeDate || "",
+    yearOfStudy: application.yearOfStudy || application.academic?.yearOfStudy || "",
+    sponsorshipStatus: application.sponsorshipStatus || application.academic?.sponsorshipStatus || "",
+    collateralType: application.collateralType || application.collateral?.type || "",
+    collateralDescription: application.collateralDescription || application.collateral?.description || "",
     campusAddress: application.campusAddress,
     homeAddress: application.homeAddress,
     googleMapsLocation: application.googleMapsLocation,
@@ -1289,14 +1380,31 @@ function validateApplicationInput(input, terms, submittedDate) {
   const errors = [];
   if (!input.fullName || input.fullName.length < 2) errors.push("Full name is required.");
   if (!input.studentId || input.studentId.length < 2) errors.push("Student ID number is required.");
-  if (!input.phone || input.phone.length < 7) errors.push("Phone number is required.");
+  if (!isValidPhone(input.phone)) errors.push("Phone number is required.");
   if (!input.motherKinName || input.motherKinName.length < 2) errors.push("Next of kin mother name is required.");
-  if (!input.motherKinPhone || normalizePhone(input.motherKinPhone).length < 7) errors.push("Mother phone number is required.");
+  if (!isValidPhone(input.motherKinPhone)) errors.push("Mother phone number is required.");
   if (!input.fatherKinName || input.fatherKinName.length < 2) errors.push("Next of kin father name is required.");
-  if (!input.fatherKinPhone || normalizePhone(input.fatherKinPhone).length < 7) errors.push("Father phone number is required.");
+  if (!isValidPhone(input.fatherKinPhone)) errors.push("Father phone number is required.");
   if (!input.campusAddress || input.campusAddress.length < 5) errors.push("Current campus/hostel address is required.");
   if (!input.homeAddress || input.homeAddress.length < 5) errors.push("Home address is required.");
   if (!isGoogleMapsUrl(input.googleMapsLocation)) errors.push("A valid Google Maps location link is required.");
+  if (input.applicantType === "worker") {
+    if (!input.placeOfWork || input.placeOfWork.length < 2) errors.push("Company name or place of work is required.");
+    if (!isValidPhone(input.employerContactNumber)) errors.push("Employer contact number is required.");
+    if (!isValidIncomeDate(input.incomeDate)) errors.push("Income date must be a day from 1 to 31.");
+    if (input.spouseName && !isValidPhone(input.spouseContact)) errors.push("Spouse contact is required when spouse name is provided.");
+    if (!input.spouseName && input.spouseContact) errors.push("Spouse name is required when spouse contact is provided.");
+  } else {
+    if (!yearOfStudyOptions.has(input.yearOfStudy)) errors.push("A valid year of study is required.");
+    if (!sponsorshipStatusOptions.has(input.sponsorshipStatus)) errors.push("A valid sponsorship status is required.");
+    if (!collateralTypeOptions.has(input.collateralType)) errors.push("A valid collateral type is required.");
+    if (!input.collateralDescription || input.collateralDescription.length < 10) {
+      errors.push("Collateral description must include make, model, and condition.");
+    }
+    if (/(house|land|plot|real\s*estate|property)/i.test(input.collateralType) || /(house|land|plot|real\s*estate|property)/i.test(input.collateralDescription)) {
+      errors.push("Collateral cannot be real estate, houses, land, plots, or property.");
+    }
+  }
   if (!terms) errors.push("A valid loan category is required.");
   if (terms && !isCategoryOpen(terms, submittedDate)) {
     errors.push(`${terms.label} applications are only accepted from day ${terms.startDay} to day ${terms.endDay} of the month.`);
@@ -1584,6 +1692,18 @@ function toAdminApplication(application) {
     motherKinPhone: application.motherKinPhone || application.nextOfKin?.mother?.phone || "",
     fatherKinName: application.fatherKinName || application.nextOfKin?.father?.name || "",
     fatherKinPhone: application.fatherKinPhone || application.nextOfKin?.father?.phone || "",
+    spouseName: application.spouseName || application.employment?.spouseName || "",
+    spouseContact: application.spouseContact || application.employment?.spouseContact || "",
+    placeOfWork: application.placeOfWork || application.employment?.placeOfWork || "",
+    employerContactNumber: application.employerContactNumber || application.employment?.employerContactNumber || "",
+    incomeDate: application.incomeDate || application.employment?.incomeDate || "",
+    yearOfStudy: application.yearOfStudy || application.academic?.yearOfStudy || "",
+    sponsorshipStatus: application.sponsorshipStatus || application.academic?.sponsorshipStatus || "",
+    collateralType: application.collateralType || application.collateral?.type || "",
+    collateralDescription: application.collateralDescription || application.collateral?.description || "",
+    employment: application.employment || null,
+    academic: application.academic || null,
+    collateral: application.collateral || null,
     nextOfKin: {
       mother: {
         name: application.motherKinName || application.nextOfKin?.mother?.name || "",
@@ -1614,6 +1734,7 @@ function toAdminApplication(application) {
       identity: documents.identity ? `/api/admin/applications/${application.id}/files/identity` : "",
       student: documents.student ? `/api/admin/applications/${application.id}/files/student` : "",
       photo: documents.photo ? `/api/admin/applications/${application.id}/files/photo` : "",
+      sponsorship: documents.sponsorship ? `/api/admin/applications/${application.id}/files/sponsorship` : "",
       signature: documents.signature ? `/api/admin/applications/${application.id}/files/signature` : "",
       homeMap: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(application.homeAddress)}`,
       googleMapsLocation: application.googleMapsLocation || ""
@@ -1622,6 +1743,7 @@ function toAdminApplication(application) {
       identity: documentSummary(documents.identity),
       student: documentSummary(documents.student),
       photo: documentSummary(documents.photo),
+      sponsorship: documentSummary(documents.sponsorship),
       signature: documentSummary(documents.signature)
     }
   };
@@ -1889,6 +2011,19 @@ function safeEqual(left, right) {
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function isValidPhone(value) {
+  const digits = normalizePhone(value);
+  if (digits.length < 7 || digits.length > 15) return false;
+  if (digits.length === 8) return true;
+  if (digits.length === 11 && digits.startsWith("267")) return true;
+  return digits.length >= 7;
+}
+
+function isValidIncomeDate(value) {
+  const day = Number.parseInt(String(value || ""), 10);
+  return Number.isInteger(day) && day >= 1 && day <= 31;
 }
 
 function normalizeEmail(value) {

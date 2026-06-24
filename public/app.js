@@ -224,6 +224,7 @@ function bindForms() {
   document.querySelector("#rebuild-spreadsheet").addEventListener("click", rebuildSpreadsheet);
   document.querySelector("#test-notifications").addEventListener("click", testNotifications);
   bindAdminQueueControls();
+  document.querySelector("#sponsorship-status")?.addEventListener("change", updateSponsorshipRequirement);
   document.querySelectorAll("#loan-form input[type='file']").forEach((input) => {
     input.addEventListener("change", () => validateSelectedFiles(input.form, true));
   });
@@ -380,6 +381,10 @@ async function submitApplication(event) {
     return;
   }
 
+  if (!validateApplicantSpecificFields(form, activeApplicantType)) {
+    return;
+  }
+
   if (!formData.get("campusAddress") || !formData.get("homeAddress")) {
     setMessage("#submission-message", "Both campus/hostel and home address are required.", "error");
     return;
@@ -431,7 +436,8 @@ function validateSelectedFiles(form, showMessage = false) {
   const labels = {
     clientPhoto: "Client Photo",
     identityDocument: "Omang / Passport Photo",
-    studentDocument: document.querySelector("#supporting-document-label")?.textContent || "Supporting Document"
+    studentDocument: document.querySelector("#supporting-document-label")?.textContent || "Supporting Document",
+    proof_of_sponsorship: "Proof of Sponsorship"
   };
 
   for (const input of form.querySelectorAll("input[type='file']")) {
@@ -451,6 +457,56 @@ function validateSelectedFiles(form, showMessage = false) {
 
   if (showMessage) setMessage("#submission-message", "", "");
   return true;
+}
+
+function validateApplicantSpecificFields(form, applicantType) {
+  const data = new FormData(form);
+
+  if (applicantType === "worker") {
+    if (!String(data.get("place_of_work") || "").trim()) {
+      setMessage("#submission-message", "Company name or place of work is required.", "error");
+      return false;
+    }
+    if (!isLikelyPhone(data.get("employer_contact_number"))) {
+      setMessage("#submission-message", "Employer contact number is required.", "error");
+      return false;
+    }
+    if (!data.get("income_date")) {
+      setMessage("#submission-message", "Income date is required.", "error");
+      return false;
+    }
+    if (String(data.get("spouse_name") || "").trim() && !isLikelyPhone(data.get("spouse_contact"))) {
+      setMessage("#submission-message", "Spouse contact is required when spouse name is provided.", "error");
+      return false;
+    }
+    return true;
+  }
+
+  if (!data.get("year_of_study")) {
+    setMessage("#submission-message", "Year of study is required.", "error");
+    return false;
+  }
+  if (!data.get("sponsorship_status")) {
+    setMessage("#submission-message", "Sponsorship status is required.", "error");
+    return false;
+  }
+  if (data.get("sponsorship_status") === "Sponsored" && !data.get("proof_of_sponsorship")?.size) {
+    setMessage("#submission-message", "Proof of sponsorship is required for sponsored students.", "error");
+    return false;
+  }
+  if (!data.get("collateral_type")) {
+    setMessage("#submission-message", "Collateral type is required.", "error");
+    return false;
+  }
+  if (String(data.get("collateral_description") || "").trim().length < 10) {
+    setMessage("#submission-message", "Collateral description must include make, model, and condition.", "error");
+    return false;
+  }
+  return true;
+}
+
+function isLikelyPhone(value) {
+  return String(value || "").replace(/\D/g, "").length >= 7;
 }
 
 function updateFileHelpText() {
@@ -787,7 +843,7 @@ function updateLogoutVisibility() {
 
 async function loadQueue() {
   const body = document.querySelector("#queue-body");
-  body.innerHTML = `<tr><td colspan="17" class="empty-state">Loading applications...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="18" class="empty-state">Loading applications...</td></tr>`;
 
   try {
     const response = await fetch("/api/admin/applications");
@@ -796,7 +852,7 @@ async function loadQueue() {
     state.applications = result.applications;
     renderQueue();
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="17" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="18" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
     updateQueueControls();
   }
 }
@@ -808,12 +864,12 @@ function renderQueue() {
   updateQueueControls();
 
   if (!state.applications.length) {
-    body.innerHTML = `<tr><td colspan="17" class="empty-state">No applications yet.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="18" class="empty-state">No applications yet.</td></tr>`;
     return;
   }
 
   if (!visibleApplications.length) {
-    body.innerHTML = `<tr><td colspan="17" class="empty-state">No ${state.queueFilter.toLowerCase()} applications in this view.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="18" class="empty-state">No ${state.queueFilter.toLowerCase()} applications in this view.</td></tr>`;
     return;
   }
 
@@ -828,6 +884,7 @@ function renderQueue() {
       <td>${escapeHtml(application.studentId)}</td>
       <td>${escapeHtml(application.phone)}</td>
       <td>${nextOfKinDetails(application)}</td>
+      <td>${riskDetails(application)}</td>
       <td>${escapeHtml(application.loanCategoryLabel || "")}</td>
       <td>${formatMoney(application.loanAmount)}</td>
       <td>${formatMoney(application.totalRepayment)}</td>
@@ -954,11 +1011,34 @@ function nextOfKinDetails(application) {
   `;
 }
 
+function riskDetails(application) {
+  if ((application.applicantType || "student") === "worker") {
+    return `
+      <div class="kin-stack">
+        <span><strong>Work:</strong> ${escapeHtml(application.placeOfWork || "")}</span>
+        <span><strong>Employer:</strong> ${escapeHtml(application.employerContactNumber || "")}</span>
+        <span><strong>Income:</strong> ${application.incomeDate ? `${escapeHtml(formatDay(Number(application.incomeDate)))}` : ""}</span>
+        ${application.spouseName ? `<span><strong>Spouse:</strong> ${escapeHtml(application.spouseName)} ${application.spouseContact ? `<small>${escapeHtml(application.spouseContact)}</small>` : ""}</span>` : ""}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="kin-stack">
+      <span><strong>Study:</strong> ${escapeHtml(application.yearOfStudy || "")}</span>
+      <span><strong>Sponsor:</strong> ${escapeHtml(application.sponsorshipStatus || "")}</span>
+      <span><strong>Collateral:</strong> ${escapeHtml(application.collateralType || "")}</span>
+      <span>${escapeHtml(application.collateralDescription || "")}</span>
+    </div>
+  `;
+}
+
 function documentLinks(application) {
   const links = [
     ["photo", "Client Photo"],
     ["identity", "Omang/Passport"],
     ["student", "Student ID"],
+    ["sponsorship", "Sponsorship Proof"],
     ["signature", "Signature"]
   ];
   return links
@@ -1017,7 +1097,33 @@ function setApplicantType(type) {
   document.querySelector("#supporting-document-help").textContent = copy.documentHelp;
   document.querySelector("#current-address-label").textContent = copy.addressLabel;
   document.querySelector("#current-address-input").placeholder = copy.addressPlaceholder;
+  updateApplicantScopedFields(normalized);
   updateFileHelpText();
+}
+
+function updateApplicantScopedFields(applicantType) {
+  document.querySelectorAll("[data-applicant-scope]").forEach((section) => {
+    const active = section.dataset.applicantScope === applicantType;
+    section.classList.toggle("hidden", !active);
+    section.querySelectorAll("input, select, textarea").forEach((field) => {
+      field.disabled = !active;
+      if (!active) field.required = false;
+    });
+  });
+
+  document.querySelectorAll("[data-required-for]").forEach((field) => {
+    field.required = field.dataset.requiredFor === applicantType && !field.disabled;
+  });
+
+  updateSponsorshipRequirement();
+}
+
+function updateSponsorshipRequirement() {
+  const applicantType = document.querySelector("#applicant-type")?.value || "student";
+  const status = document.querySelector("#sponsorship-status")?.value;
+  const proof = document.querySelector("#proof-of-sponsorship");
+  if (!proof) return;
+  proof.required = applicantType === "student" && status === "Sponsored" && !proof.disabled;
 }
 
 async function approve(id, checkbox) {

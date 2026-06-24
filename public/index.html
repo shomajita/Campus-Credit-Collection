@@ -374,6 +374,95 @@
               </div>
             </fieldset>
 
+            <fieldset class="student-only applicant-section" data-applicant-scope="student">
+              <legend>Academic & Sponsorship Details</legend>
+              <div class="field-grid">
+                <label>
+                  <span>Year of Study</span>
+                  <select name="year_of_study" data-required-for="student">
+                    <option value="">Select year</option>
+                    <option value="Year 1">Year 1</option>
+                    <option value="Year 2">Year 2</option>
+                    <option value="Year 3">Year 3</option>
+                    <option value="Year 4">Year 4</option>
+                    <option value="Post-grad">Post-grad</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Sponsorship Status</span>
+                  <select id="sponsorship-status" name="sponsorship_status" data-required-for="student">
+                    <option value="">Select status</option>
+                    <option value="Sponsored">Sponsored</option>
+                    <option value="Self-Sponsored">Self-Sponsored</option>
+                  </select>
+                </label>
+                <label class="file-field compact-file">
+                  <span>Proof of Sponsorship</span>
+                  <input id="proof-of-sponsorship" name="proof_of_sponsorship" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+                  <small>Required when sponsored. JPG, PNG, WEBP, or PDF. Max 25MB.</small>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="worker-only applicant-section hidden" data-applicant-scope="worker">
+              <legend>Employment & Household Details</legend>
+              <div class="field-grid two">
+                <label>
+                  <span>Company Name / Place of Work</span>
+                  <input name="place_of_work" maxlength="160" data-required-for="worker" placeholder="Employer or company name">
+                </label>
+                <label>
+                  <span>Employer Contact Number</span>
+                  <input name="employer_contact_number" autocomplete="tel" maxlength="30" data-required-for="worker" placeholder="+267 ...">
+                </label>
+                <label>
+                  <span>Income Date</span>
+                  <select name="income_date" data-required-for="worker">
+                    <option value="">Select day salary is received</option>
+                    <option value="1">1st</option>
+                    <option value="2">2nd</option>
+                    <option value="3">3rd</option>
+                    <option value="4">4th</option>
+                    <option value="5">5th</option>
+                    <option value="6">6th</option>
+                    <option value="7">7th</option>
+                    <option value="8">8th</option>
+                    <option value="9">9th</option>
+                    <option value="10">10th</option>
+                    <option value="11">11th</option>
+                    <option value="12">12th</option>
+                    <option value="13">13th</option>
+                    <option value="14">14th</option>
+                    <option value="15">15th</option>
+                    <option value="16">16th</option>
+                    <option value="17">17th</option>
+                    <option value="18">18th</option>
+                    <option value="19">19th</option>
+                    <option value="20">20th</option>
+                    <option value="21">21st</option>
+                    <option value="22">22nd</option>
+                    <option value="23">23rd</option>
+                    <option value="24">24th</option>
+                    <option value="25">25th</option>
+                    <option value="26">26th</option>
+                    <option value="27">27th</option>
+                    <option value="28">28th</option>
+                    <option value="29">29th</option>
+                    <option value="30">30th</option>
+                    <option value="31">31st</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Spouse Name</span>
+                  <input name="spouse_name" maxlength="120" placeholder="Optional">
+                </label>
+                <label>
+                  <span>Spouse Contact</span>
+                  <input name="spouse_contact" autocomplete="tel" maxlength="30" placeholder="Required if spouse name is provided">
+                </label>
+              </div>
+            </fieldset>
+
             <fieldset>
               <legend>Loan Calculator</legend>
               <label class="category-field">
@@ -406,6 +495,28 @@
                   <span>Repayment Due Date</span>
                   <strong id="due-date">Loading</strong>
                 </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="student-only applicant-section" data-applicant-scope="student">
+              <legend>Collateral Security</legend>
+              <div class="collateral-notice">
+                In the event of non-payment, the borrower is legally obliged to provide collateral as security.
+              </div>
+              <div class="field-grid two">
+                <label>
+                  <span>Collateral Type</span>
+                  <select name="collateral_type" data-required-for="student">
+                    <option value="">Select collateral type</option>
+                    <option value="Electronics (Smartphone, Laptop, Tablet)">Electronics (Smartphone, Laptop, Tablet)</option>
+                    <option value="Valuable Personal Item">Valuable Personal Item</option>
+                    <option value="Other Asset">Other Asset</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Collateral Description</span>
+                  <textarea name="collateral_description" maxlength="500" rows="3" data-required-for="student" placeholder="Samsung Galaxy S23, Mint Condition"></textarea>
+                </label>
               </div>
             </fieldset>
 
@@ -626,6 +737,7 @@
                     <th>Applicant ID</th>
                     <th>Phone</th>
                     <th>Next of Kin</th>
+                    <th>Risk Details</th>
                     <th>Category</th>
                     <th>Amount</th>
                     <th>Total In</th>
@@ -640,7 +752,7 @@
                 </thead>
                 <tbody id="queue-body">
                   <tr>
-                    <td colspan="17" class="empty-state">Log in to load applications.</td>
+                    <td colspan="18" class="empty-state">Log in to load applications.</td>
                   </tr>
                 </tbody>
               </table>
@@ -650,6 +762,6 @@
       </section>
     </main>
 
-    <script src="/app.js?v=20260616-notify1"></script>
+    <script src="/app.js?v=20260624-worker-student-fields1"></script>
   </body>
 </html>
