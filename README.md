@@ -92,19 +92,15 @@ Or set `EMAIL_WEBHOOK_URL` to receive a JSON payload with the application summar
 
 ## Render Hosting
 
-This repository includes `render.yaml` for a Render web service.
+This repository includes `render.yaml` for one Render web service: the main STUCHA Loans website.
 
 Use a paid Render web service plan with a persistent disk. Render's normal service filesystem is ephemeral, so uploaded IDs/photos/signatures and the local spreadsheet need the disk mounted at `/var/data`.
-
-The Blueprint also defines a separate `stucha-webhook-api` Python service for Railway PostgreSQL/Jotform webhooks. If you apply the Blueprint, Render will ask you to fill the secrets marked `sync: false`, including `DATABASE_URL`.
-
-The webhook service is pinned to Python `3.12.13` through `.python-version` and `PYTHON_VERSION`. This avoids compatibility problems with Render's newer default Python runtime.
 
 Recommended Render settings:
 
 ```text
 Build Command: npm install
-Start Command: node server.js
+Start Command: node render-start.js
 Health Check Path: /healthz
 Persistent Disk Mount Path: /var/data
 ```
@@ -146,21 +142,6 @@ EMAIL_WEBHOOK_URL=https://...
 ```
 
 Setting only `OWNER_WHATSAPP_TO` or only `OWNER_EMAIL` stores the destination, but an actual provider such as Twilio, SendGrid, or a webhook is required to send real alerts.
-
-## Railway PostgreSQL + Jotform Webhook API
-
-This repository also includes a separate FastAPI webhook service in `services/webhook_api`. Use it when you are ready to receive Jotform webhooks, store submissions in Railway PostgreSQL, and optionally append summary rows to Google Sheets.
-
-Deploy it as a second Render Web Service using:
-
-```text
-Root Directory: leave blank
-Build Command: pip install -r services/webhook_api/requirements.txt
-Start Command: cd services/webhook_api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
-Health Check Path: /healthz
-```
-
-Set `DATABASE_URL` in Render to your rotated Railway public/proxy PostgreSQL connection string. Do not use the private `postgres.railway.internal` URL, and do not commit the real Railway URL to GitHub. Full setup instructions are in `services/webhook_api/README.md`.
 
 ## Production Notes
 

@@ -1,1 +1,0 @@
-"""STUCHA webhook API package."""
