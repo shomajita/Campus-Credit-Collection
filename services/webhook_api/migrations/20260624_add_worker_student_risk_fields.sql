@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS students (
 ALTER TABLE students
   ADD COLUMN IF NOT EXISTS year_of_study text,
   ADD COLUMN IF NOT EXISTS sponsorship_status text,
-  ADD COLUMN IF NOT EXISTS proof_of_sponsorship text,
   ADD COLUMN IF NOT EXISTS collateral_type text,
   ADD COLUMN IF NOT EXISTS collateral_description text;
 

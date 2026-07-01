@@ -417,16 +417,12 @@ async function createApplication(req, res) {
   const identityFile = form.get("identityDocument");
   const studentFile = form.get("studentDocument");
   const photoFile = form.get("clientPhoto");
-  const sponsorshipFile = form.get("proof_of_sponsorship") || form.get("proofOfSponsorship");
 
   if (!isUploadFile(identityFile)) errors.push("Identity document photo is required.");
   if (!isUploadFile(studentFile)) {
     errors.push(input.applicantType === "worker" ? "Payslip or employment proof is required." : "Student ID photo is required.");
   }
   if (!isUploadFile(photoFile)) errors.push("Client photo is required.");
-  if (input.applicantType === "student" && input.sponsorshipStatus === "Sponsored" && !isUploadFile(sponsorshipFile)) {
-    errors.push("Proof of sponsorship is required for sponsored students.");
-  }
   if (!input.signatureData) errors.push("Client signature is required.");
 
   if (errors.length) {
@@ -438,9 +434,6 @@ async function createApplication(req, res) {
   const identityDocument = await storeUpload(applicationId, "identity", identityFile);
   const studentDocument = await storeUpload(applicationId, "student", studentFile);
   const clientPhoto = await storeUpload(applicationId, "photo", photoFile, { imageOnly: true });
-  const sponsorshipDocument = isUploadFile(sponsorshipFile)
-    ? await storeUpload(applicationId, "sponsorship", sponsorshipFile)
-    : null;
   const signatureDocument = await storeSignature(applicationId, input.signatureData);
   const interestAmount = roundMoney(input.loanAmount * terms.rate);
   const totalRepayment = roundMoney(input.loanAmount + interestAmount);
@@ -512,7 +505,6 @@ async function createApplication(req, res) {
       identity: identityDocument,
       student: studentDocument,
       photo: clientPhoto,
-      sponsorship: sponsorshipDocument,
       signature: signatureDocument
     },
     notifications: {
@@ -981,7 +973,6 @@ function localSpreadsheetHeaders() {
     "Income Date",
     "Year of Study",
     "Sponsorship Status",
-    "Proof of Sponsorship Link",
     "Collateral Type",
     "Collateral Description",
     "Current Campus/Workplace Address",
@@ -1027,7 +1018,6 @@ function toLocalSpreadsheetRow(application) {
     application.incomeDate || application.employment?.incomeDate || "",
     application.yearOfStudy || application.academic?.yearOfStudy || "",
     application.sponsorshipStatus || application.academic?.sponsorshipStatus || "",
-    links.sponsorship,
     application.collateralType || application.collateral?.type || "",
     application.collateralDescription || application.collateral?.description || "",
     application.campusAddress,
@@ -1059,7 +1049,6 @@ function protectedDocumentLinks(application) {
     photo: documents.photo ? `${base}/photo` : "",
     identity: documents.identity ? `${base}/identity` : "",
     student: documents.student ? `${base}/student` : "",
-    sponsorship: documents.sponsorship ? `${base}/sponsorship` : "",
     signature: documents.signature ? `${base}/signature` : ""
   };
 }
@@ -1191,7 +1180,6 @@ async function sendEmailAlert(application) {
             identity: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/identity`,
             student: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/student`,
             photo: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/photo`,
-            sponsorship: application.documents?.sponsorship ? `${config.publicAppUrl}/api/admin/applications/${application.id}/files/sponsorship` : "",
             signature: `${config.publicAppUrl}/api/admin/applications/${application.id}/files/signature`
           }
         })
@@ -1734,7 +1722,6 @@ function toAdminApplication(application) {
       identity: documents.identity ? `/api/admin/applications/${application.id}/files/identity` : "",
       student: documents.student ? `/api/admin/applications/${application.id}/files/student` : "",
       photo: documents.photo ? `/api/admin/applications/${application.id}/files/photo` : "",
-      sponsorship: documents.sponsorship ? `/api/admin/applications/${application.id}/files/sponsorship` : "",
       signature: documents.signature ? `/api/admin/applications/${application.id}/files/signature` : "",
       homeMap: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(application.homeAddress)}`,
       googleMapsLocation: application.googleMapsLocation || ""
@@ -1743,7 +1730,6 @@ function toAdminApplication(application) {
       identity: documentSummary(documents.identity),
       student: documentSummary(documents.student),
       photo: documentSummary(documents.photo),
-      sponsorship: documentSummary(documents.sponsorship),
       signature: documentSummary(documents.signature)
     }
   };

@@ -224,7 +224,6 @@ function bindForms() {
   document.querySelector("#rebuild-spreadsheet").addEventListener("click", rebuildSpreadsheet);
   document.querySelector("#test-notifications").addEventListener("click", testNotifications);
   bindAdminQueueControls();
-  document.querySelector("#sponsorship-status")?.addEventListener("change", updateSponsorshipRequirement);
   document.querySelectorAll("#loan-form input[type='file']").forEach((input) => {
     input.addEventListener("change", () => validateSelectedFiles(input.form, true));
   });
@@ -436,8 +435,7 @@ function validateSelectedFiles(form, showMessage = false) {
   const labels = {
     clientPhoto: "Client Photo",
     identityDocument: "Omang / Passport Photo",
-    studentDocument: document.querySelector("#supporting-document-label")?.textContent || "Supporting Document",
-    proof_of_sponsorship: "Proof of Sponsorship"
+    studentDocument: document.querySelector("#supporting-document-label")?.textContent || "Supporting Document"
   };
 
   for (const input of form.querySelectorAll("input[type='file']")) {
@@ -488,10 +486,6 @@ function validateApplicantSpecificFields(form, applicantType) {
   }
   if (!data.get("sponsorship_status")) {
     setMessage("#submission-message", "Sponsorship status is required.", "error");
-    return false;
-  }
-  if (data.get("sponsorship_status") === "Sponsored" && !data.get("proof_of_sponsorship")?.size) {
-    setMessage("#submission-message", "Proof of sponsorship is required for sponsored students.", "error");
     return false;
   }
   if (!data.get("collateral_type")) {
@@ -1038,7 +1032,6 @@ function documentLinks(application) {
     ["photo", "Client Photo"],
     ["identity", "Omang/Passport"],
     ["student", "Student ID"],
-    ["sponsorship", "Sponsorship Proof"],
     ["signature", "Signature"]
   ];
   return links
@@ -1115,15 +1108,6 @@ function updateApplicantScopedFields(applicantType) {
     field.required = field.dataset.requiredFor === applicantType && !field.disabled;
   });
 
-  updateSponsorshipRequirement();
-}
-
-function updateSponsorshipRequirement() {
-  const applicantType = document.querySelector("#applicant-type")?.value || "student";
-  const status = document.querySelector("#sponsorship-status")?.value;
-  const proof = document.querySelector("#proof-of-sponsorship");
-  if (!proof) return;
-  proof.required = applicantType === "student" && status === "Sponsored" && !proof.disabled;
 }
 
 async function approve(id, checkbox) {
